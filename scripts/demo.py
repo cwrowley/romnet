@@ -5,7 +5,7 @@ import romnet
 from noack import NoackModel, random_ic
 
 def main():
-    model = NoackModel()
+    model = NoackModel(mu=0.1, omega=2., A=-0.1, lam=10)
     dt = 0.1
     model.set_stepper(dt, method="rk2", nsteps=5)
 
