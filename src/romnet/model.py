@@ -34,6 +34,10 @@ class Timestepper:
             v = self.step_(v, f)
         return v
 
+    @classmethod
+    def methods(cls):
+        return list(cls.__registry.keys())
+
 class Euler(Timestepper):
     name = "euler"
     def step_(self, x, rhs):
