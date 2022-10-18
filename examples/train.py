@@ -1,10 +1,14 @@
+#!/usr/bin/env python
+
 import numpy as np
 import torch
 from torch.utils.data import DataLoader
+import sys
 import romnet
 
-def main(basename):
+def train_autoencoder(basename):
     # load data
+    print(f"Loading data from {basename}_train.dat")
     training_data = romnet.load(basename + "_train.dat")
     test_data = romnet.load(basename + "_test.dat")
 
@@ -25,4 +29,7 @@ def main(basename):
         romnet.test_loop(test_dataloader, autoencoder, loss_fn)
 
 if __name__ == "__main__":
-    main("noack")
+    if len(sys.argv) < 2:
+        train_autoencoder("noack")
+    else:
+        train_autoencoder(sys.argv[1])
