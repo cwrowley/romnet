@@ -1,2 +1,7 @@
+__pycache__
+*.log
+*.out
+*.aux
+*.synctex.gz
 notes/cobras.pdf
 examples/*.dat
