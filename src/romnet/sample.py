@@ -1,6 +1,7 @@
 import numpy as np
+import pickle
 
-__all__ = ["sample", "sample_gradient"]
+__all__ = ["sample", "sample_gradient", "load"]
 
 class TrajectoryList:
     """
@@ -46,6 +47,14 @@ class GradientDataset:
     def __getitem__(self, i):
         return self.X[i], self.G[i]
 
+    def save(self, fname):
+        with open(fname, 'wb') as fp:
+            pickle.dump(self, fp, pickle.HIGHEST_PROTOCOL)
+
+def load(fname):
+    with open(fname, 'rb') as fp:
+        data = pickle.load(fp)
+    return data
 
 def sample(step, random_state, num_traj, n):
     """
