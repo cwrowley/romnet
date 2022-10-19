@@ -2,7 +2,6 @@
 
 import torch
 import numpy as np
-import matplotlib.pyplot as plt
 import pytest
 from romnet.autoencoder import LayerPair, ProjAE
 
@@ -17,10 +16,10 @@ def plot_pair():
     w = pair.dec_activ(y)
     err = np.max(np.abs((x-w).numpy()))
     print("Error = %g" % err)
-    plt.plot(x, y)
-    plt.plot(x, z)
-    plt.plot(x, w)
-    plt.show()
+    # plt.plot(x, y)
+    # plt.plot(x, z)
+    # plt.plot(x, w)
+    # plt.show()
 
 
 def test_pair21():
