@@ -3,6 +3,7 @@ import pickle
 
 __all__ = ["sample", "sample_gradient", "load"]
 
+
 class TrajectoryList:
     """
     Container for samples of trajectories
@@ -51,10 +52,12 @@ class GradientDataset:
         with open(fname, 'wb') as fp:
             pickle.dump(self, fp, pickle.HIGHEST_PROTOCOL)
 
+
 def load(fname):
     with open(fname, 'rb') as fp:
         data = pickle.load(fp)
     return data
+
 
 def sample(step, random_state, num_traj, n):
     """
@@ -75,6 +78,7 @@ def sample(step, random_state, num_traj, n):
             traj.append(x)
         traj_list.append(traj)
     return TrajectoryList(traj_list)
+
 
 def sample_gradient(traj_list, model, samples_per_traj, L):
     """

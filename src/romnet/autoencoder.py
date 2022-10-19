@@ -8,6 +8,7 @@ __all__ = ["ProjAE", "GAP_loss"]
 # for better compatibility with numpy arrays
 torch.set_default_dtype(torch.float64)
 
+
 class LayerPair(nn.Module):
     def __init__(self, dim_in, dim_out, angle=None):
         super().__init__()
@@ -22,14 +23,15 @@ class LayerPair(nn.Module):
         self.dim_out = dim_out
 
         # initialize weights
-        Q = ortho_group.rvs(dim_in)[:,:dim_out]
-        self.D = nn.Parameter(torch.tensor(Q))  # matrix for decoding
-        self.X = nn.Parameter(torch.tensor(Q.transpose())) # matrix for encoding
+        Q = ortho_group.rvs(dim_in)[:, :dim_out]
+        self.D = nn.Parameter(torch.tensor(Q))  # decoding matrix
+        self.X = nn.Parameter(torch.tensor(Q.transpose()))  # encoding matrix
         self.update()
 
         # initialize biases
         self.bias = nn.Parameter(-np.sqrt(2*self.a) / self.a *
-            torch.matmul(self.D, torch.ones(self.dim_out,1)))
+                                 torch.matmul(self.D,
+                                              torch.ones(self.dim_out, 1)))
 
     def extra_repr(self):
         return "%d, %d" % (self.dim_in, self.dim_out)
@@ -47,11 +49,11 @@ class LayerPair(nn.Module):
 
     def d_enc_activ(self, x):
         return (self.b / self.a - self.d * x /
-                (self.a * torch.sqrt( self.d * x**2 + 2*self.a )))
+                (self.a * torch.sqrt(self.d * x**2 + 2*self.a)))
 
     def d_dec_activ(self, x):
         return (self.b / self.a + self.d * x /
-                (self.a * torch.sqrt( self.d * x**2 + 2*self.a )))
+                (self.a * torch.sqrt(self.d * x**2 + 2*self.a)))
 
     def enc(self, x):
         """Encoder"""
@@ -62,12 +64,14 @@ class LayerPair(nn.Module):
         x = torch.as_tensor(x).unsqueeze(-1)
         return self.enc_activ(
             torch.linalg.solve(torch.matmul(self.E, self.D),
-                               torch.matmul(self.E, x - self.bias))).squeeze(-1)
+                               torch.matmul(self.E,
+                                            x - self.bias))).squeeze(-1)
 
     def dec(self, x):
         """Decoder"""
         x = torch.as_tensor(x).unsqueeze(-1)
-        return (torch.matmul(self.D, self.dec_activ(x)) + self.bias).squeeze(-1)
+        return (torch.matmul(self.D, self.dec_activ(x))
+                + self.bias).squeeze(-1)
 
     def forward(self, x):
         return self.dec(self.enc(x))
@@ -79,7 +83,7 @@ class LayerPair(nn.Module):
         return (self.d_enc_activ(
                         torch.linalg.solve(
                             torch.matmul(self.E, self.D),
-                            torch.matmul(self.E, x - self.bias )
+                            torch.matmul(self.E, x - self.bias)
                         )
                     ) * torch.linalg.solve(
                             torch.matmul(self.E, self.D),
@@ -90,7 +94,8 @@ class LayerPair(nn.Module):
         """Tangent map of decoder"""
         x = torch.as_tensor(x)
         v = torch.as_tensor(v).unsqueeze(-1)
-        return torch.matmul(self.D, self.d_dec_activ(x) * v ).squeeze(-1)
+        return torch.matmul(self.D, self.d_dec_activ(x) * v).squeeze(-1)
+
 
 class ProjAE(nn.Module):
     """
@@ -139,6 +144,7 @@ class ProjAE(nn.Module):
 
     def forward(self, x):
         return self.dec(self.enc(x))
+
 
 def GAP_loss(Xpred, X, G):
     return torch.mean(torch.square(torch.sum(G * (Xpred - X), dim=1)))

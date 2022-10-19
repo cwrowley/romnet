@@ -6,11 +6,12 @@ import matplotlib.pyplot as plt
 import pytest
 from romnet.autoencoder import LayerPair, ProjAE
 
+
 def plot_pair():
     pair = LayerPair(2, 1)
     for p in pair.parameters():
         print(p)
-    x = torch.tensor(np.linspace(-3,3,100))
+    x = torch.tensor(np.linspace(-3, 3, 100))
     y = pair.enc_activ(x)
     z = pair.dec_activ(x)
     w = pair.dec_activ(y)
@@ -20,6 +21,7 @@ def plot_pair():
     plt.plot(x, z)
     plt.plot(x, w)
     plt.show()
+
 
 def test_pair21():
     pair = LayerPair(2, 1)
@@ -43,6 +45,7 @@ def test_pair21():
     assert zz[1] == pytest.approx(2*z)
     assert zz[2] == pytest.approx(3*z)
 
+
 def test_pair22():
     pair = LayerPair(2, 2)
     x = np.ones(2)
@@ -57,13 +60,14 @@ def test_pair22():
     print(zbatch)
     assert zbatch == pytest.approx(batch)
 
+
 def test_pair_tangent():
-    pairs = [LayerPair(2,1), LayerPair(2,2)]
-    sizes = [1,2]
+    pairs = [LayerPair(2, 1), LayerPair(2, 2)]
+    sizes = [1, 2]
     x = np.ones(2)
     v0 = np.zeros(2)
-    v1 = np.array([1.,0])
-    v2 = np.array([0.,1])
+    v1 = np.array([1., 0])
+    v2 = np.array([0., 1])
     for i, pair in enumerate(pairs):
         w0 = pair.d_enc(x, v0)
         w1 = pair.d_enc(x, v1)
@@ -89,10 +93,12 @@ def test_pair_tangent():
         xbatch = np.array([x, x, x, x])
         vbatch = np.array([v0, v1, v2, v1+v2])
         wbatch = pair.d_enc(xbatch, vbatch)
+        assert wbatch.size() == torch.Size([4, sizes[i]])
         # zbatch = pair.d_dec(xbatch, wbatch)
 
+
 def test_ae():
-    dims = [5,3,2]
+    dims = [5, 3, 2]
     ae = ProjAE(dims)
     x = np.ones(5)
     y = ae.enc(x)
@@ -112,6 +118,7 @@ def test_ae():
     assert zz.size() == torch.Size([3, 5])
     zz = zz.detach().numpy()
     assert zz[0] == pytest.approx(z)
+
 
 if __name__ == "__main__":
     # plot_pair()

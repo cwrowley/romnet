@@ -2,6 +2,7 @@ import abc
 
 __all__ = ["timestepper", "Model"]
 
+
 class Timestepper:
     # registry for subclasses, mapping names to constructors
     __registry = dict()
@@ -29,7 +30,8 @@ class Timestepper:
         return x
 
     def adjoint_step(self, x, v):
-        f = lambda v : self.adjoint_rhs(x, v)
+        def f(v):
+            return self.adjoint_rhs(x, v)
         for i in range(self.nsteps):
             v = self.step_(v, f)
         return v
@@ -38,20 +40,26 @@ class Timestepper:
     def methods(cls):
         return list(cls.__registry.keys())
 
+
 class Euler(Timestepper):
     name = "euler"
+
     def step_(self, x, rhs):
         return x + self.dt * rhs(x)
 
+
 class RK2(Timestepper):
     name = "rk2"
+
     def step_(self, x, rhs):
         k1 = self.dt * rhs(x)
         k2 = self.dt * rhs(x + k1)
         return x + (k1 + k2) / 2.
 
+
 class RK4(Timestepper):
     name = "rk4"
+
     def step_(self, x, rhs):
         k1 = self.dt * rhs(x)
         k2 = self.dt * rhs(x + k1 / 2.)
@@ -59,9 +67,11 @@ class RK4(Timestepper):
         k4 = self.dt * rhs(x + k3)
         return x + (k1 + 2 * k2 + 2 * k3 + k4) / 6.
 
+
 def timestepper(dt, rhs, method="rk2", **kwargs):
     cls = Timestepper.lookup(method)
     return cls(dt, rhs, **kwargs)
+
 
 class Model(abc.ABC):
     @abc.abstractmethod

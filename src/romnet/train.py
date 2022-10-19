@@ -2,6 +2,7 @@ import torch
 
 __all__ = ["train_loop", "test_loop"]
 
+
 def train_loop(dataloader, autoencoder, loss_fn, optimizer):
     size = len(dataloader.dataset)
     for batch, (X, G) in enumerate(dataloader):
@@ -16,6 +17,7 @@ def train_loop(dataloader, autoencoder, loss_fn, optimizer):
         if batch % 100 == 0:
             loss, current = loss.item(), batch * len(X)
             print(f"loss: {loss:>7f} [{current:>5d}/{size:>5d}]")
+
 
 def test_loop(dataloader, autoencoder, loss_fn):
     num_batches = len(dataloader)

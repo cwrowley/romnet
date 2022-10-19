@@ -1,10 +1,10 @@
 #!/usr/bin/env python
 
-import numpy as np
 import torch
 from torch.utils.data import DataLoader
 import sys
 import romnet
+
 
 def train_autoencoder(basename):
     # load data
@@ -20,13 +20,16 @@ def train_autoencoder(basename):
     autoencoder = romnet.ProjAE(dims)
     loss_fn = romnet.GAP_loss
     optimizer = torch.optim.Adam(autoencoder.parameters(), lr=learning_rate)
-    train_dataloader = DataLoader(training_data, batch_size=batch_size, shuffle=True)
-    test_dataloader = DataLoader(test_data, batch_size=batch_size, shuffle=True)
+    train_dataloader = DataLoader(training_data,
+                                  batch_size=batch_size, shuffle=True)
+    test_dataloader = DataLoader(test_data,
+                                 batch_size=batch_size, shuffle=True)
 
     for t in range(num_epochs):
         print(f"Epoch {t+1}\n-----------------")
         romnet.train_loop(train_dataloader, autoencoder, loss_fn, optimizer)
         romnet.test_loop(test_dataloader, autoencoder, loss_fn)
+
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:
