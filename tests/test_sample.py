@@ -43,36 +43,35 @@ def test_trajlist():
     assert b.traj[0].shape == (5, 2, 2)
 
 
-def try_sample():
+def test_sample():
     dim = 2
     model = MyModel(dim=dim, debug=False)
     dt = 0.1
     model.set_stepper(dt, method='rk2')
     # stepper = timestepper(model, dt)
-    num_traj = 50
-    n = 25
+    num_traj = 5
+    n = 10
     def random_ic(): return np.random.randn(dim)
     data = sample(model.step, random_ic, num_traj, n)
+    assert len(data) == num_traj * n
     # for i,x in enumerate(data.traj):
     #     print("Trajectory %d\n-------------" % i)
     #     print(x)
 
-    s = 10  # samples per trajectory
-    L = 20  # horizon for gradient sampling
+    s = 3  # samples per trajectory
+    L = 5  # horizon for gradient sampling
+    batch_size = 7
     grad_data = sample_gradient(data, model, s, L)
-
-    dataloader = torch.utils.data.DataLoader(grad_data,
-                                             batch_size=5, shuffle=True)
-    print(dataloader)
+    assert len(grad_data) == num_traj * s
+    dataloader = torch.utils.data.DataLoader(grad_data, batch_size=batch_size,
+                                             shuffle=True)
     X, G = next(iter(dataloader))
-    print(X.size())
-    print(X)
-    print(G.size())
-    print(G)
+    assert X.shape == torch.Size([batch_size, dim])
+    assert G.shape == torch.Size([batch_size, dim])
 
 
 if __name__ == "__main__":
     # try_steppers()
     # test_trajlist()
-    try_sample()
+    test_sample()
     # try_sample_grad()
