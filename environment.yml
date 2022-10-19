@@ -1,8 +1,0 @@
-name: torch
-channels:
-  - conda-forge
-  - defaults
-dependencies:
-  - numpy
-  - pytorch
-  - scipy

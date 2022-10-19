@@ -6,22 +6,6 @@ import pytest
 from romnet.autoencoder import LayerPair, ProjAE
 
 
-def plot_pair():
-    pair = LayerPair(2, 1)
-    for p in pair.parameters():
-        print(p)
-    x = torch.tensor(np.linspace(-3, 3, 100))
-    y = pair.enc_activ(x)
-    z = pair.dec_activ(x)
-    w = pair.dec_activ(y)
-    err = np.max(np.abs((x-w).numpy()))
-    print("Error = %g" % err)
-    # plt.plot(x, y)
-    # plt.plot(x, z)
-    # plt.plot(x, w)
-    # plt.show()
-
-
 def test_pair21():
     pair = LayerPair(2, 1)
     x = np.ones(2)
@@ -120,7 +104,6 @@ def test_ae():
 
 
 if __name__ == "__main__":
-    # plot_pair()
     # test_pair21()
     # test_pair2()
     test_ae()
