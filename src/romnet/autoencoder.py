@@ -117,25 +117,25 @@ class ProjAE(nn.Module):
             pair.update()
 
     def enc(self, x):
-        for i in range(self.num_layers):
-            x = self.layers[i].enc(x)
+        for layer in self.layers:
+            x = layer.enc(x)
         return x
 
     def dec(self, x):
-        for i in reversed(range(self.num_layers)):
-            x = self.layers[i].dec(x)
+        for layer in reversed(self.layers):
+            x = layer.dec(x)
         return x
 
     def d_enc(self, x, v):
-        for i in range(self.num_layers):
-            v = self.layers[i].d_enc(x, v)
-            x = self.layers[i].enc(x)
+        for layer in self.layers:
+            v = layer.d_enc(x, v)
+            x = layer.enc(x)
         return x, v
 
     def d_dec(self, x, v):
-        for i in reversed(range(self.num_layers)):
-            v = self.layers[i].d_dec(x, v)
-            x = self.layers[i].dec(x)
+        for layer in reversed(self.layers):
+            v = layer.d_dec(x, v)
+            x = layer.dec(x)
         return x, v
 
     def d_autoenc(self, x, v):
