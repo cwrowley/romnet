@@ -30,8 +30,7 @@ class LayerPair(nn.Module):
 
         # initialize biases
         self.bias = nn.Parameter(-np.sqrt(2*self.a) / self.a *
-                                 torch.matmul(self.D,
-                                              torch.ones(self.dim_out, 1)))
+                                 (self.D @ torch.ones(self.dim_out, 1)))
 
     def extra_repr(self):
         return "%d, %d" % (self.dim_in, self.dim_out)
@@ -63,9 +62,9 @@ class LayerPair(nn.Module):
     def enc_slow(self, x):
         x = torch.as_tensor(x).unsqueeze(-1)
         return self.enc_activ(
-            torch.linalg.solve(torch.matmul(self.E, self.D),
-                               torch.matmul(self.E,
-                                            x - self.bias))).squeeze(-1)
+                torch.linalg.solve(torch.matmul(self.X, self.D),
+                                   torch.matmul(self.X,
+                                                x - self.bias))).squeeze(-1)
 
     def dec(self, x):
         """Decoder"""
@@ -80,21 +79,18 @@ class LayerPair(nn.Module):
         """Tangent map of encoder"""
         x = torch.as_tensor(x).unsqueeze(-1)
         v = torch.as_tensor(v).unsqueeze(-1)
-        return (self.d_enc_activ(
-                        torch.linalg.solve(
-                            torch.matmul(self.E, self.D),
-                            torch.matmul(self.E, x - self.bias)
-                        )
-                    ) * torch.linalg.solve(
-                            torch.matmul(self.E, self.D),
-                            torch.matmul(self.E, v)
-                        )).squeeze(-1)
+        return (self.d_enc_activ(self.E  @ (x - self.bias)) *
+                self.E @ v).squeeze(-1)
 
     def d_dec(self, x, v):
         """Tangent map of decoder"""
-        x = torch.as_tensor(x)
+        x = torch.as_tensor(x).unsqueeze(-1)
         v = torch.as_tensor(v).unsqueeze(-1)
         return torch.matmul(self.D, self.d_dec_activ(x) * v).squeeze(-1)
+
+    def regularizer(self):
+        P = self.D @ self.E
+        return torch.log(torch.frobenius_norm(P)**2 / self.dim_out)
 
 
 class ProjAE(nn.Module):
@@ -144,6 +140,12 @@ class ProjAE(nn.Module):
 
     def forward(self, x):
         return self.dec(self.enc(x))
+
+    def regularizer(self):
+        total_regularizer = 0
+        for layer in self.layers:
+            total_regularizer += layer.regularizer()
+        return total_regularizer
 
 
 def GAP_loss(Xpred, X, G):
