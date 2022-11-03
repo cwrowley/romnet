@@ -44,6 +44,7 @@ def test_pair22():
     assert zbatch == pytest.approx(batch)
 
 
+@pytest.mark.skip(reason="Tangent map not implemented yet")
 def test_pair_tangent():
     pairs = [LayerPair(2, 1), LayerPair(2, 2)]
     sizes = [1, 2]
