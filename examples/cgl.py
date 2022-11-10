@@ -211,7 +211,7 @@ def psi_fun(n, x):
 def compare_timesteppers():
     t_final = 500
     nx = 220
-    dt1 = 0.05
+    dt1 = 0.5
     dt2 = 0.5
     dt3 = 0.5
     num_steps1 = int(t_final / dt1) + 1
@@ -222,7 +222,7 @@ def compare_timesteppers():
     t3 = dt3 * np.arange(num_steps3)
 
     model = CGL(nx)
-    method1 = "rk4"
+    method1 = "rk3cn"
     model.set_stepper(dt1, method=method1)
 
     model2 = CGL(nx)
