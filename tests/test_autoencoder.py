@@ -105,6 +105,7 @@ def test_ae():
 
 
 if __name__ == "__main__":
-    # test_pair21()
-    # test_pair2()
+    #test_pair21()
+    #test_pair2()
     test_ae()
+    test_pair_tangent()

@@ -18,7 +18,10 @@ def train_autoencoder(basename):
     num_epochs = 50
     dims = [3, 3, 3, 3, 3, 2]
     autoencoder = romnet.ProjAE(dims)
-    loss_fn = romnet.GAP_loss
+    gamma = 1.e-3
+
+    def loss_fn(Xpred, X, G):
+        return romnet.GAP_loss(Xpred, X, G) + gamma * autoencoder.regularizer()
     optimizer = torch.optim.Adam(autoencoder.parameters(), lr=learning_rate)
     train_dataloader = DataLoader(training_data,
                                   batch_size=batch_size, shuffle=True)
