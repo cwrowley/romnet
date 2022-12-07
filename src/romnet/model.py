@@ -5,7 +5,7 @@ import abc
 import numpy as np
 from scipy.linalg import lu_factor, lu_solve
 
-__all__ = ["Model", "SemiLinearModel"]
+__all__ = ["Model", "SemiLinearModel", "BilinearModel"]
 
 
 class Timestepper(abc.ABC):
@@ -216,7 +216,7 @@ class Model(abc.ABC):
 
     Subclasses must override two methods:
       rhs(x) - returns the right-hand side f(x)
-      adjoint_rhs(x, v) -
+      adjoint_rhs(x, v) - returns the adjoint of Df(x), applied to the vector v
     """
 
     @abc.abstractmethod
@@ -283,3 +283,29 @@ class SemiLinearModel(Model):
             self.adjoint_step = self.stepper.adjoint_step
         else:
             super().set_stepper(dt, method=method, **kwargs)
+
+
+class BilinearModel(SemiLinearModel):
+    """Model where the right-hand side is a bilinear function of the state
+
+    Models have the form
+        x' = c + L x + B(x, x)
+    where B is bilinear
+    """
+
+    def __init__(self, c, L, B):
+        self._affine = c
+        self.linear = L
+        self._bilinear = B
+
+    def bilinear(self, a, b):
+        """Evaluate the bilinear term B(a, b)"""
+        return self._bilinear.dot(a).dot(b)
+
+    def nonlinear(self, x):
+        return self._affine + self.bilinear(x, x)
+
+    def adjoint_nonlinear(self, x, v):
+        w = np.einsum("kji, j, k", self._bilinear, x, v)
+        w += np.einsum("jik, j, k", self._bilinear, v, x)
+        return w
