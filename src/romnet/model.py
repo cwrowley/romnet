@@ -294,7 +294,7 @@ class BilinearModel(SemiLinearModel):
     """
 
     def __init__(self, c, L, B):
-        self._affine = c
+        self.affine = c
         self.linear = L
         self._bilinear = B
 
@@ -303,9 +303,43 @@ class BilinearModel(SemiLinearModel):
         return self._bilinear.dot(a).dot(b)
 
     def nonlinear(self, x):
-        return self._affine + self.bilinear(x, x)
+        return self.affine + self.bilinear(x, x)
 
     def adjoint_nonlinear(self, x, v):
         w = np.einsum("kji, j, k", self._bilinear, x, v)
         w += np.einsum("jik, j, k", self._bilinear, v, x)
         return w
+
+    def project(self, V, W=None):
+        """
+        Return a reduced-order model by projecting onto linear subspaces
+
+        Rows of V determine the subspace to project onto
+        Rows of W determine the direction of projection
+
+        That is, the projection is given by
+          V' (WV')^{-1} W
+
+        The number of states in the reduced-order model is the number of rows
+        in V (or W).
+
+        If W is not specified, it is assumed W = V
+        """
+        numstates = len(V)
+        if W is None:
+            W = V
+        assert len(W) == numstates
+
+        # Let W1 = (W V')^{-1} W
+        G = W @ V.T
+        W1 = np.linalg.solve(G, W)
+        # Now projection is given by P = V' W1, and W1 V' = Identity
+
+        c = W1 @ self.affine
+        L = W1 @ self.linear @ V.T
+        B = np.zeros((numstates, numstates, numstates))
+        for i in range(numstates):
+            for j in range(numstates):
+                for k in range(numstates):
+                    B[i, j, k] = np.dot(W1[i], self.bilinear(V[j], V[k]))
+        return BilinearModel(c, L, B)
