@@ -44,7 +44,6 @@ def test_pair22():
     assert zbatch == pytest.approx(batch)
 
 
-@pytest.mark.skip(reason="Tangent map not implemented yet")
 def test_pair_tangent():
     pairs = [LayerPair(2, 1), LayerPair(2, 2)]
     sizes = [1, 2]
@@ -59,10 +58,9 @@ def test_pair_tangent():
         w12 = pair.d_enc(x, v1 + v2)
         assert w0.size() == torch.Size([sizes[i]])
         assert w1.size() == torch.Size([sizes[i]])
-        w0 = w0.detach().numpy()
-        assert w0 == pytest.approx(0)
-        assert (w1.detach().numpy() + w2.detach().numpy() ==
-                pytest.approx(w12.detach().numpy()))
+        assert w0.detach() == pytest.approx(0)
+        assert (w1.detach() + w2.detach() ==
+                pytest.approx(w12.detach()))
 
         y = pair.enc(x)
         z0 = pair.d_dec(y, w0)
@@ -71,14 +69,21 @@ def test_pair_tangent():
         z12 = pair.d_dec(y, w1 + w2)
         assert z0.size() == torch.Size([2])
         assert z1.size() == torch.Size([2])
-        assert (z1.detach().numpy() + z2.detach().numpy() ==
-                pytest.approx(z12.detach().numpy()))
+        assert (z1.detach() + z2.detach() ==
+                pytest.approx(z12.detach()))
 
         xbatch = np.array([x, x, x, x])
         vbatch = np.array([v0, v1, v2, v1+v2])
         wbatch = pair.d_enc(xbatch, vbatch)
         assert wbatch.size() == torch.Size([4, sizes[i]])
-        # zbatch = pair.d_dec(xbatch, wbatch)
+        for w, ww in zip(wbatch.detach(), [w0, w1, w2, w12]):
+            assert w == pytest.approx(ww.detach())
+
+        y = y.detach().numpy()
+        ybatch = np.array([y, y, y, y])
+        zbatch = pair.d_dec(ybatch, wbatch)
+        for z, zz in zip(zbatch.detach(), [z0, z1, z2, z12]):
+            assert z == pytest.approx(zz.detach())
 
 
 def test_ae():
@@ -105,7 +110,5 @@ def test_ae():
 
 
 if __name__ == "__main__":
-    #test_pair21()
-    #test_pair2()
     test_ae()
     test_pair_tangent()
