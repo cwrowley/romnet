@@ -5,7 +5,7 @@ import abc
 import numpy as np
 from scipy.linalg import lu_factor, lu_solve
 
-__all__ = ["Model", "SemiLinearModel"]
+__all__ = ["Model", "SemiLinearModel", "BilinearModel"]
 
 
 class Timestepper(abc.ABC):
@@ -216,7 +216,7 @@ class Model(abc.ABC):
 
     Subclasses must override two methods:
       rhs(x) - returns the right-hand side f(x)
-      adjoint_rhs(x, v) -
+      adjoint_rhs(x, v) - returns the adjoint of Df(x), applied to the vector v
     """
 
     @abc.abstractmethod
@@ -283,3 +283,63 @@ class SemiLinearModel(Model):
             self.adjoint_step = self.stepper.adjoint_step
         else:
             super().set_stepper(dt, method=method, **kwargs)
+
+
+class BilinearModel(SemiLinearModel):
+    """Model where the right-hand side is a bilinear function of the state
+
+    Models have the form
+        x' = c + L x + B(x, x)
+    where B is bilinear
+    """
+
+    def __init__(self, c, L, B):
+        self.affine = c
+        self.linear = L
+        self._bilinear = B
+
+    def bilinear(self, a, b):
+        """Evaluate the bilinear term B(a, b)"""
+        return self._bilinear.dot(a).dot(b)
+
+    def nonlinear(self, x):
+        return self.affine + self.bilinear(x, x)
+
+    def adjoint_nonlinear(self, x, v):
+        w = np.einsum("kji, j, k", self._bilinear, x, v)
+        w += np.einsum("jik, j, k", self._bilinear, v, x)
+        return w
+
+    def project(self, V, W=None):
+        """
+        Return a reduced-order model by projecting onto linear subspaces
+
+        Rows of V determine the subspace to project onto
+        Rows of W determine the direction of projection
+
+        That is, the projection is given by
+          V' (WV')^{-1} W
+
+        The number of states in the reduced-order model is the number of rows
+        in V (or W).
+
+        If W is not specified, it is assumed W = V
+        """
+        numstates = len(V)
+        if W is None:
+            W = V
+        assert len(W) == numstates
+
+        # Let W1 = (W V')^{-1} W
+        G = W @ V.T
+        W1 = np.linalg.solve(G, W)
+        # Now projection is given by P = V' W1, and W1 V' = Identity
+
+        c = W1 @ self.affine
+        L = W1 @ self.linear @ V.T
+        B = np.zeros((numstates, numstates, numstates))
+        for i in range(numstates):
+            for j in range(numstates):
+                for k in range(numstates):
+                    B[i, j, k] = np.dot(W1[i], self.bilinear(V[j], V[k]))
+        return BilinearModel(c, L, B)
