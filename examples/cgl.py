@@ -8,9 +8,7 @@ import matplotlib.pyplot as plt
 import time
 
 
-def herdif(N, order):
-    D_mats = [_ for _ in range(order)]
-
+def herdif(N, order):  # noqa: C901
     # define collocation points
     x_coll, _ = roots_hermite(N)
 
@@ -56,6 +54,7 @@ def herdif(N, order):
     # main recursion described in Table II of W&R
     Y = np.ones((N-1, N))
     D = np.eye(N)
+    D_mats = list()
     for k in range(order):
         # recursion for diagonals
         Y = np.cumsum(np.vstack([np.reshape(B[k, :], (1, -1)),
@@ -69,7 +68,7 @@ def herdif(N, order):
         for i in range(N):
             D[i, i] = Y[N-1, i]
 
-        D_mats[k] = D
+        D_mats.append(D)
 
     return x_coll, D_mats
 
