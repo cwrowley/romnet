@@ -2,6 +2,7 @@ import numpy as np
 from romnet.model import Model
 from romnet.model import BilinearModel
 from romnet.model import NetworkLiftedROM
+from romnet.model import LinearLiftedROM
 from romnet.autoencoder import ProjAE
 import pytest
 
@@ -200,11 +201,22 @@ def pitchfork_network_model(pitchfork_model, pitchfork_autoencoder):
     return NetworkLiftedROM(pitchfork_model, pitchfork_autoencoder)
 
 
-def test_pitchfork_network_model(pitchfork_model, pitchfork_autoencoder,
-                                 pitchfork_network_model):
+def test_pitchfork_network_lifted_model(pitchfork_model, pitchfork_autoencoder,
+                                        pitchfork_network_model):
     x = np.random.randn(2)
     v1 = pitchfork_model.rhs(x)
     z = pitchfork_autoencoder.enc(x)
     vv = pitchfork_network_model.rhs(z)
     _, v2 = pitchfork_autoencoder.d_dec(z, vv)
     assert v1 == pytest.approx(v2.detach().numpy())
+
+
+def test_pitchfork_linear_lifted_model(pitchfork_model):
+    Phi_T = np.array([[1, 0]])
+    Psi_T = np.array([[1, 0]])
+    rom = LinearLiftedROM(pitchfork_model, Phi_T, Psi_T)
+    x = np.random.randn(2)
+    z = Psi_T @ x
+    direct = Psi_T @ pitchfork_model.rhs(Phi_T.T @ z)
+    romClass = rom.rhs(z)
+    assert direct == pytest.approx(romClass)

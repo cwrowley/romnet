@@ -346,6 +346,42 @@ class BilinearModel(SemiLinearModel):
         return BilinearModel(c, L, B)
 
 
+class LinearLiftedROM(Model):
+    """
+    Return a reduced-order model by projecting onto linear subspaces
+
+    Rows of V determine the subspace to project onto
+    Rows of W determine the direction of projection
+
+    That is, the projection is given by
+        V' (WV')^{-1} W
+
+    The number of states in the reduced-order model is the number of rows
+    in V (or W).
+
+    If W is not specified, it is assumed W = V
+    """
+
+    def __init__(self, model, V, W=None):
+        self.model = model
+        self.V = V
+        numstates = len(V)
+        if W is None:
+            W = V
+        assert len(W) == numstates
+
+        # Let W1 = (W V')^{-1} W
+        G = W @ V.T
+        self.W1 = np.linalg.solve(G, W)
+        # Now projection is given by P = V' W1, and W1 V' = Identity
+
+    def rhs(self, z):
+        return self.W1 @ self.model.rhs(self.V.T @ z)
+
+    def adjoint_rhs(self, x, v):
+        return -1
+
+
 class NetworkLiftedROM(Model):
     """
     Return a reduced-order model by projecting onto the tangent space
