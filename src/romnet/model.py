@@ -5,7 +5,8 @@ import abc
 import numpy as np
 from scipy.linalg import lu_factor, lu_solve
 
-__all__ = ["Model", "SemiLinearModel", "BilinearModel"]
+__all__ = ["Timestepper", "SemiImplicit",
+           "Model", "SemiLinearModel", "BilinearModel"]
 
 
 class Timestepper(abc.ABC):
@@ -27,27 +28,12 @@ class Timestepper(abc.ABC):
         except KeyError as exc:
             raise NotImplementedError(f"Method '{method}' unknown") from exc
 
-    def __init__(self, dt, rhs, adjoint_rhs=None, nsteps=1):
+    def __init__(self, dt):
         self.dt = dt
-        self.rhs = rhs
-        self.adjoint_rhs = adjoint_rhs
-        self.nsteps = nsteps
 
     @abc.abstractmethod
-    def step_(self, x, rhs):
+    def step(self, x, rhs):
         """Advance the state x by one timestep, for the ODE x' = rhs(x)."""
-
-    def step(self, x):
-        for _ in range(self.nsteps):
-            x = self.step_(x, self.rhs)
-        return x
-
-    def adjoint_step(self, x, v):
-        def f(v):
-            return self.adjoint_rhs(x, v)
-        for _ in range(self.nsteps):
-            v = self.step_(v, f)
-        return v
 
     @classmethod
     def methods(cls):
@@ -73,12 +59,10 @@ class SemiImplicit(abc.ABC):
         except KeyError as exc:
             raise NotImplementedError(f"Method '{method}' unknown") from exc
 
-    def __init__(self, dt, linear, nonlinear, adjoint_nonlinear, nsteps=1):
+    def __init__(self, dt, linear, solver_factory):
         self._dt = dt
         self.linear = linear
-        self.nonlinear = nonlinear
-        self.adjoint_nonlinear = adjoint_nonlinear
-        self.nsteps = nsteps
+        self.get_solver = solver_factory
         self.update()
 
     @property
@@ -99,22 +83,8 @@ class SemiImplicit(abc.ABC):
         """
 
     @abc.abstractmethod
-    def step_(self, x, linear, nonlinear, transpose=0):
+    def step(self, x, nonlinear):
         """Advance the state forward by one step"""
-
-    def step(self, x):
-        """Advance the state x by one step."""
-        for _ in range(self.nsteps):
-            x = self.step_(x, self.linear, self.nonlinear, transpose=0)
-        return x
-
-    def adjoint_step(self, x, v):
-        """Advance the adjoint variable v by one step, linearized about x."""
-        def f(w):
-            return self.adjoint_nonlinear(x, w)
-        for _ in range(self.nsteps):
-            v = self.step_(v, self.linear.T, f, transpose=1)
-        return v
 
     @classmethod
     def methods(cls):
@@ -124,14 +94,14 @@ class SemiImplicit(abc.ABC):
 class Euler(Timestepper):
     """Explicit Euler timestepper."""
 
-    def step_(self, x, rhs):
+    def step(self, x, rhs):
         return x + self.dt * rhs(x)
 
 
 class RK2(Timestepper):
     """Second-order Runge-Kutta timestepper."""
 
-    def step_(self, x, rhs):
+    def step(self, x, rhs):
         k1 = self.dt * rhs(x)
         k2 = self.dt * rhs(x + k1)
         return x + (k1 + k2) / 2.
@@ -140,7 +110,7 @@ class RK2(Timestepper):
 class RK4(Timestepper):
     """Fourth-order Runge-Kutta timestepper."""
 
-    def step_(self, x, rhs):
+    def step(self, x, rhs):
         k1 = self.dt * rhs(x)
         k2 = self.dt * rhs(x + k1 / 2.)
         k3 = self.dt * rhs(x + k2 / 2.)
@@ -155,19 +125,17 @@ class RK2CN(SemiImplicit):
     """
 
     def update(self):
-        nstates = self.linear.shape[0]
-        mat = np.eye(nstates) - 0.5 * self.dt * self.linear
-        self.LU = lu_factor(mat)
+        self.solve = self.get_solver(0.5 * self.dt)
 
-    def step_(self, x, linear, nonlinear, transpose=0):
-        rhs_linear = x + 0.5 * self.dt * np.dot(linear, x)
+    def step(self, x, nonlinear):
+        rhs_linear = x + 0.5 * self.dt * self.linear(x)
         Nx = nonlinear(x)
 
         rhs1 = rhs_linear + self.dt * Nx
-        x1 = lu_solve(self.LU, rhs1, trans=transpose)
+        x1 = self.solve(rhs1)
 
         rhs2 = rhs_linear + 0.5 * self.dt * (Nx + nonlinear(x1))
-        x2 = lu_solve(self.LU, rhs2, trans=transpose)
+        x2 = self.solve(rhs2)
         return x2
 
 
@@ -182,32 +150,24 @@ class RK3CN(SemiImplicit):
     Bprime = [1./6, 5./24, 1./8]
 
     def update(self):
-        nstates = self.linear.shape[0]
-        mat1 = np.eye(nstates) - self.Bprime[0] * self.dt * self.linear
-        mat2 = np.eye(nstates) - self.Bprime[1] * self.dt * self.linear
-        mat3 = np.eye(nstates) - self.Bprime[2] * self.dt * self.linear
+        self.solvers = [self.get_solver(b * self.dt) for b in self.Bprime]
 
-        self.LU = []
-        self.LU.append(lu_factor(mat1))
-        self.LU.append(lu_factor(mat2))
-        self.LU.append(lu_factor(mat3))
-
-    def step_(self, x, linear, nonlinear, transpose=0):
+    def step(self, x, nonlinear):
         A = self.A
         B = self.B
         Bprime = self.Bprime
 
         Q1 = self.dt * nonlinear(x)
-        rhs1 = x + B[0] * Q1 + Bprime[0] * self.dt * np.dot(linear, x)
-        x1 = lu_solve(self.LU[0], rhs1, trans=transpose)
+        rhs1 = x + B[0] * Q1 + Bprime[0] * self.dt * self.linear(x)
+        x1 = self.solvers[0](rhs1)
 
         Q2 = A[1] * Q1 + self.dt * nonlinear(x1)
-        rhs2 = x1 + B[1] * Q2 + Bprime[1] * self.dt * np.dot(linear, x1)
-        x2 = lu_solve(self.LU[1], rhs2, trans=transpose)
+        rhs2 = x1 + B[1] * Q2 + Bprime[1] * self.dt * self.linear(x1)
+        x2 = self.solvers[1](rhs2)
 
         Q3 = A[2] * Q2 + self.dt * nonlinear(x2)
-        rhs3 = x2 + B[2] * Q3 + Bprime[2] * self.dt * np.dot(linear, x2)
-        x3 = lu_solve(self.LU[2], rhs3, trans=transpose)
+        rhs3 = x2 + B[2] * Q3 + Bprime[2] * self.dt * self.linear(x2)
+        x3 = self.solvers[2](rhs3)
         return x3
 
 
@@ -223,9 +183,10 @@ class Model(abc.ABC):
     def rhs(self, x):
         """Return the right-hand-side of the ODE x' = f(x)."""
 
-    @abc.abstractmethod
     def adjoint_rhs(self, x, v):
         """For the right-hand-side function f(x), return Df(x)^T v."""
+        raise NotImplementedError("Adjoint not implemented for class %s" %
+                                  self.__class__.__name__)
 
     def output(self, x):
         """
@@ -243,13 +204,24 @@ class Model(abc.ABC):
         """
         return v
 
+    def step(self, x):
+        try:
+            return self.stepper.step(x, self.rhs)
+        except AttributeError:
+            raise AttributeError("Timestepper not defined")
+
+    def adjoint_step(self, x, v):
+        def f(w):
+            return self.adjoint_rhs(x, w)
+        try:
+            return self.stepper.step(v, f)
+        except AttributeError:
+            raise AttributeError("Adjoint timestepper not defined")
+
     def set_stepper(self, dt, method="rk2", **kwargs):
         """Configure a timestepper for the model."""
         cls = Timestepper.lookup(method)
-        self.stepper = cls(dt, self.rhs,
-                           adjoint_rhs=self.adjoint_rhs, **kwargs)
-        self.step = self.stepper.step
-        self.adjoint_step = self.stepper.adjoint_step
+        self.stepper = cls(dt)
 
 
 class SemiLinearModel(Model):
@@ -259,30 +231,67 @@ class SemiLinearModel(Model):
         x' = A x + N(x)
     """
 
+    def linear(self, x):
+        return self._linear.dot(x)
+
     @abc.abstractmethod
     def nonlinear(self, x):
         pass
 
-    @abc.abstractmethod
-    def adjoint_nonlinear(self, x, v):
-        pass
-
     def rhs(self, x):
-        return np.dot(self.linear, x) + self.nonlinear(x)
+        return self.linear(x) + self.nonlinear(x)
+
+    def adjoint(self, x):
+        return self._linear.T.dot(x)
+
+    def adjoint_nonlinear(self, x, v):
+        """Return the adjoint of DN(x) applied to the vector v"""
+        raise NotImplementedError("Adjoint not implemented for class %s" %
+                                  self.__class__.__name__)
+        raise AttributeError("Adjoint not implemented")
 
     def adjoint_rhs(self, x, v):
-        return np.dot(self.linear.T, v) + self.adjoint_nonlinear(x, v)
+        return self.adjoint(v) + self.adjoint_nonlinear(x, v)
 
-    def set_stepper(self, dt, method="rk2cn", **kwargs):
+    def get_solver(self, alpha):
+        # default implementation, assumes matrix self._linear has been defined
+        nstates = self._linear.shape[0]
+        mat = np.eye(nstates) - alpha * self._linear
+        return LUSolver(mat)
+
+    def get_adjoint_solver(self, alpha):
+        # default implementation, assumes matrix self._linear has been defined
+        nstates = self._linear.shape[0]
+        mat = np.eye(nstates) - alpha * self._linear.T
+        return LUSolver(mat)
+
+    def set_stepper(self, dt, method="rk2cn"):
         """Configure a timestepper for the semilinear model."""
         if method in SemiImplicit.methods():
             cls = SemiImplicit.lookup(method)
-            self.stepper = cls(dt, self.linear, self.nonlinear,
-                               self.adjoint_nonlinear, **kwargs)
-            self.step = self.stepper.step
-            self.adjoint_step = self.stepper.adjoint_step
+            self.stepper = cls(dt, self.linear, self.get_solver)
+
+            def step(x):
+                return self.stepper.step(x, self.nonlinear)
+            self.step = step
+            self.adjoint_stepper = cls(dt, self.adjoint,
+                                       self.get_adjoint_solver)
+
+            def adj_step(x, v):
+                def f(w):
+                    return self.adjoint_nonlinear(x, w)
+                return self.adjoint_stepper.step(v, f)
+            self.adjoint_step = adj_step
         else:
-            super().set_stepper(dt, method=method, **kwargs)
+            super().set_stepper(dt, method=method)
+
+
+class LUSolver:
+    def __init__(self, mat):
+        self.LU = lu_factor(mat)
+
+    def __call__(self, rhs):
+        return lu_solve(self.LU, rhs)
 
 
 class BilinearModel(SemiLinearModel):
@@ -294,16 +303,23 @@ class BilinearModel(SemiLinearModel):
     """
 
     def __init__(self, c, L, B):
-        self.affine = c
-        self.linear = L
-        self._bilinear = B
+        self._affine = np.array(c)
+        self._linear = np.array(L)
+        self._bilinear = np.array(B)
+        self.state_dim = self._linear.shape[0]
+
+    def linear(self, x):
+        return self._linear.dot(x)
+
+    def adjoint(self, x):
+        return self._linear.T.dot(x)
 
     def bilinear(self, a, b):
         """Evaluate the bilinear term B(a, b)"""
         return self._bilinear.dot(a).dot(b)
 
     def nonlinear(self, x):
-        return self.affine + self.bilinear(x, x)
+        return self._affine + self.bilinear(x, x)
 
     def adjoint_nonlinear(self, x, v):
         w = np.einsum("kji, j, k", self._bilinear, x, v)
@@ -325,21 +341,23 @@ class BilinearModel(SemiLinearModel):
 
         If W is not specified, it is assumed W = V
         """
-        numstates = len(V)
+        n = len(V)
         if W is None:
             W = V
-        assert len(W) == numstates
+        assert len(W) == n
 
         # Let W1 = (W V')^{-1} W
-        G = W @ V.T
+        G = np.array([[np.dot(W[i], V[j]) for j in range(n)]
+                      for i in range(n)])
         W1 = np.linalg.solve(G, W)
         # Now projection is given by P = V' W1, and W1 V' = Identity
 
-        c = W1 @ self.affine
-        L = W1 @ self.linear @ V.T
-        B = np.zeros((numstates, numstates, numstates))
-        for i in range(numstates):
-            for j in range(numstates):
-                for k in range(numstates):
-                    B[i, j, k] = np.dot(W1[i], self.bilinear(V[j], V[k]))
+        c = np.array([np.dot(W1[i], self._affine) for i in range(n)])
+        L = np.array([[np.dot(W1[i], self.linear(V[j]))
+                       for j in range(n)]
+                      for i in range(n)])
+        B = np.array([[[np.dot(W1[i], self.bilinear(V[j], V[k]))
+                        for k in range(n)]
+                       for j in range(n)]
+                      for i in range(n)])
         return BilinearModel(c, L, B)
