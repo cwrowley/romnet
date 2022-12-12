@@ -4,6 +4,7 @@
 import abc
 import numpy as np
 from scipy.linalg import lu_factor, lu_solve
+from sklearn.gaussian_process import kernels, GaussianProcessRegressor
 import torch
 
 __all__ = ["Model", "SemiLinearModel", "BilinearModel"]
@@ -348,7 +349,7 @@ class BilinearModel(SemiLinearModel):
 
 class LinearLiftedROM(Model):
     """
-    Return a reduced-order model by projecting onto linear subspaces
+    A reduced-order model that projects the dynamics onto linear subspaces
 
     Rows of V determine the subspace to project onto
     Rows of W determine the direction of projection
@@ -384,7 +385,7 @@ class LinearLiftedROM(Model):
 
 class NetworkLiftedROM(Model):
     """
-    Return a reduced-order model by projecting onto the tangent space
+    A reduced-order model that projects the dynamics onto the tangent space
     of a nonlinear manifold defined by the range of a romnet neural network.
 
     Torch gradient information is not preserved.
@@ -408,6 +409,30 @@ class NetworkLiftedROM(Model):
             x = self.autoencoder.dec(z)
             _, v = self.autoencoder.d_enc(x, self.model.rhs(x))
             return v.numpy()
+
+    def adjoint_rhs(self, x, v):
+        return -1
+
+
+class GaussianProcessROM(Model):
+    """
+    A reduced-order model that approximates a given
+    systems right-hand side by Gaussian process regression.
+
+    Let z = f(z) be the function we wish to approximate.
+
+    The Gaussian process reduced-order model is a function
+    g(z) ~= f(z) determined by Gaussian process regression.
+    """
+
+    def __init__(self, inputdata, outputdata, kernel=None):
+        if kernel is None:
+            kernel = kernels.RBF()
+        self.gp = GaussianProcessRegressor(kernel=kernel)
+        self.gp.fit(inputdata, outputdata)
+
+    def rhs(self, x):
+        return self.gp.predict(x)
 
     def adjoint_rhs(self, x, v):
         return -1
