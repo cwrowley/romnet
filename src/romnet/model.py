@@ -4,6 +4,7 @@
 import abc
 import numpy as np
 from scipy.linalg import lu_factor, lu_solve
+import torch
 
 __all__ = ["Model", "SemiLinearModel", "BilinearModel"]
 
@@ -343,3 +344,34 @@ class BilinearModel(SemiLinearModel):
                 for k in range(numstates):
                     B[i, j, k] = np.dot(W1[i], self.bilinear(V[j], V[k]))
         return BilinearModel(c, L, B)
+
+
+class NetworkLiftedROM(Model):
+    """
+    Return a reduced-order model by projecting onto the tangent space
+    of a nonlinear manifold defined by the range of a romnet neural network.
+
+    Torch gradient information is not preserved.
+
+    The rom neural network is a differentiable idempotent operator
+    P(x) = psid(psie(x)) = psid(z).
+
+    The reduced-order model in state space is given by
+    xdot = DP(x)f(x).
+
+    The reduced-order model in the latent space is given by
+    zdot = Dpsie(psid(z))f(psid(z)).
+    """
+
+    def __init__(self, model, autoencoder):
+        self.model = model
+        self.autoencoder = autoencoder
+
+    def rhs(self, z):
+        with torch.no_grad():
+            x = self.autoencoder.dec(z)
+            _, v = self.autoencoder.d_enc(x, self.model.rhs(x))
+            return v.numpy()
+
+    def adjoint_rhs(self, x, v):
+        return -1

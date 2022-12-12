@@ -1,5 +1,8 @@
 import numpy as np
+from romnet.model import Model
 from romnet.model import BilinearModel
+from romnet.model import NetworkLiftedROM
+from romnet.autoencoder import ProjAE
 import pytest
 
 
@@ -128,3 +131,80 @@ def test_projection1(example1):
 
 def test_projection2(example2):
     compare_projection(example2)
+
+
+class Pitchfork(Model):
+    """
+    Example pitchfork bifurcation model in two dimensions.
+
+    xdot = x(a^2 - x^2)
+    ydot = lam * (x^2 - y)
+
+    Two asymptotically stable fixed points at (-a, a^2), (a, a^2)
+    One unstable fixed point at (0,0)
+
+    a controls the fix point locations
+    lam controls the speed of fast dynamics
+
+    Slow manifold near critical manifold of {(x,y) : y = x^2}
+    """
+
+    def __init__(self, a=1., lam=10.):
+        self.a = a
+        self.lam = lam
+
+    def rhs(self, x):
+        xdot = x[0] * (self.a**2 - x[0]**2)
+        ydot = self.lam * (x[0]**2 - x[1])
+        return np.array([xdot, ydot])
+
+    def jac(self, x):
+        df1 = [self.a**2 - 3 * x[0]**2, 0]
+        df2 = [2 * self.lam * x[0], -self.lam]
+        return np.array([df1, df2])
+
+    def adjoint_rhs(self, x, v):
+        return self.jac(x).T @ v
+
+
+@pytest.fixture
+def pitchfork_model():
+    return Pitchfork()
+
+
+@pytest.fixture
+def pitchfork_autoencoder():
+    """
+    Return an untrained romnet autoencoder with latent dimension
+    equal to the state dimension.
+
+    The weights will be initialized to the identity as is written
+    in the ProjAE class in autoencoder.py
+
+    Thus, P = Id and DP = Id on R^2.
+    """
+    dims = [2, 2]
+    return ProjAE(dims)
+
+
+def test_pitchfork_autoencoder(pitchfork_autoencoder):
+    x = np.random.randn(2)
+    v = np.random.randn(2)
+    assert x == pytest.approx(pitchfork_autoencoder(x).detach().numpy())
+    _, dP = pitchfork_autoencoder.d_autoenc(x, v)
+    assert v == pytest.approx(dP.detach().numpy())
+
+
+@pytest.fixture
+def pitchfork_network_model(pitchfork_model, pitchfork_autoencoder):
+    return NetworkLiftedROM(pitchfork_model, pitchfork_autoencoder)
+
+
+def test_pitchfork_network_model(pitchfork_model, pitchfork_autoencoder,
+                                 pitchfork_network_model):
+    x = np.random.randn(2)
+    v1 = pitchfork_model.rhs(x)
+    z = pitchfork_autoencoder.enc(x)
+    vv = pitchfork_network_model.rhs(z)
+    _, v2 = pitchfork_autoencoder.d_dec(z, vv)
+    assert v1 == pytest.approx(v2.detach().numpy())
