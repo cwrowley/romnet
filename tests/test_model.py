@@ -235,7 +235,7 @@ def test_pitchfork_gaussian_process_rom(pitchfork_network_lifted_rom):
             temp.append(np.vstack((xpts[i+1]*np.ones_like(xpts), xpts)))
         return np.hstack(temp).T
 
-    inputdata = squaregrid(5, 20)
+    inputdata = squaregrid(5, 40)
 
     def rowwise_function_eval(func, data):
         dataout = np.zeros_like(data)
