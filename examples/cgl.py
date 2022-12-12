@@ -88,7 +88,8 @@ class CGL(romnet.SemiLinearModel):
         self.mu0 = mu0
         self.mu2 = mu2
         self.a = a
-        self.linear, self.weights, self.xi, self.x = self._construct_matrices()
+        self._linear, self.weights, self.xi, self.x = \
+            self._construct_matrices()
         self.C = self._construct_output()
 
     @property

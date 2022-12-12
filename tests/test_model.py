@@ -48,7 +48,7 @@ def example1(beta):
     L = np.diag([-1, -2, -5])
     B = np.zeros((3, 3, 3))
     B[0, 0, 2] = beta  # x z term in the first equation
-    B[1, 1, 2] = beta  # x y term in the second equation
+    B[1, 1, 2] = beta  # y z term in the second equation
     return BilinearModel(c, L, B)
 
 
@@ -64,8 +64,8 @@ class BilinearExample(BilinearModel):
     """
     def __init__(self, beta):
         self.beta = beta
-        self.affine = np.zeros(3)
-        self.linear = np.diag([-1, -2, -5])
+        self._affine = np.zeros(3)
+        self._linear = np.diag([-1, -2, -5])
 
     def bilinear(self, a, b):
         result = np.zeros(3)
@@ -98,8 +98,8 @@ def test_project_xy(example1):
     """Project the example orthogonally onto the x-y plane"""
     V = np.array([[1, 0, 0], [0, 1, 0]])
     rom = example1.project(V)
-    assert rom.affine == pytest.approx(np.zeros(2))
-    assert rom.linear == pytest.approx(np.diag([-1, -2]))
+    assert rom.nonlinear(np.zeros(2)) == pytest.approx(np.zeros(2))
+    assert rom._linear == pytest.approx(np.diag([-1, -2]))
     z = np.random.randn(2)
     assert rom.nonlinear(z) == pytest.approx(0)
 
@@ -107,15 +107,17 @@ def test_project_xy(example1):
 def compare_projection(full_model):
     """Oblique projection"""
     eps = 0.1
-    V = np.array([[1 - eps, 0, eps],
-                  [0, 1 - eps, eps]])
-    W = np.array([[1, 0, 1],
-                  [0, 1, 1]])
+    # Here, V and W are lists of modes (or could be numpy arrays)
+    V = [np.array([1 - eps, 0, eps]),
+         np.array([0, 1 - eps, eps])]
+    W = [np.array([1, 0, 1]),
+         np.array([0, 1, 1])]
     W1 = np.array([[1, -eps, 1 - eps],
                    [-eps, 1, 1 - eps]]) / (1 - eps**2)
     rom1 = full_model.project(V, W)
     rom2 = full_model.project(V, W1)
     z = np.random.randn(2)
+    V = np.array(V)
     x = V.T @ z
     proj_rhs = W1 @ full_model.rhs(x)
     assert rom1.rhs(z) == pytest.approx(proj_rhs)
@@ -128,3 +130,10 @@ def test_projection1(example1):
 
 def test_projection2(example2):
     compare_projection(example2)
+
+
+def test_stepper(example1):
+    dt = 0.1
+    example1.set_stepper(dt, method="rk2cn")
+    x = np.array([1, 1, 1])
+    example1.step(x)
