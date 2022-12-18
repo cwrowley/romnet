@@ -190,6 +190,9 @@ class Model:
         if adjoint_rhs is not None:
             setattr(self, "adjoint_output", adjoint_output)
 
+    def rhs(self, x):
+        """Return the right-hand-side of the ODE x' = f(x)."""
+
     def adjoint_rhs(self, x, v):
         """For the right-hand-side function f(x), return Df(x)^T v."""
         raise NotImplementedError("Adjoint not implemented for class %s" %
