@@ -4,7 +4,6 @@
 import abc
 import numpy as np
 from scipy.linalg import lu_factor, lu_solve
-from sklearn.gaussian_process import kernels, GaussianProcessRegressor
 import torch
 
 __all__ = ["Timestepper", "SemiImplicit",
@@ -173,17 +172,23 @@ class RK3CN(SemiImplicit):
         return x3
 
 
-class Model(abc.ABC):
-    """Abstract base class defining an ODE dx/dt = f(x).
+class Model:
+    """
+    Class defining an ODE dx/dt = f(x)
 
-    Subclasses must override two methods:
-      rhs(x) - returns the right-hand side f(x)
-      adjoint_rhs(x, v) - returns the adjoint of Df(x), applied to the vector v
+    The constructor requires we input the right-hand side of the ODE, x' = f(x)
+    The right-hand side method is called rhs(x)
     """
 
-    @abc.abstractmethod
-    def rhs(self, x):
-        """Return the right-hand-side of the ODE x' = f(x)."""
+    def __init__(self, rhs, adjoint_rhs=None, output=None,
+                 adjoint_output=None):
+        setattr(self, "rhs", rhs)
+        if adjoint_rhs is not None:
+            setattr(self, "adjoint_rhs", adjoint_rhs)
+        if adjoint_rhs is not None:
+            setattr(self, "output", output)
+        if adjoint_rhs is not None:
+            setattr(self, "adjoint_output", adjoint_output)
 
     def adjoint_rhs(self, x, v):
         """For the right-hand-side function f(x), return Df(x)^T v."""
@@ -425,23 +430,3 @@ class NetworkROM(Model):
             x = self.autoencoder.dec(z)
             _, v = self.autoencoder.d_enc(x, self.model.rhs(x))
             return v.numpy()
-
-
-class GaussianProcessROM(Model):
-    """
-    A surrogate reduced-order model described by Gaussian process regression
-
-    Let zdot = f(z) be the function we wish to approximate
-
-    The Gaussian process reduced-order model is a function
-    g(z) ~= f(z) = zdot  determined by Gaussian process regression
-    """
-
-    def __init__(self, inputdata, outputdata, kernel=None):
-        if kernel is None:
-            kernel = kernels.RBF()
-        self.gp = GaussianProcessRegressor(kernel=kernel)
-        self.gp.fit(inputdata, outputdata)
-
-    def rhs(self, x):
-        return self.gp.predict(x)

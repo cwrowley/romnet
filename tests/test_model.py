@@ -1,10 +1,9 @@
 import numpy as np
-from sklearn.gaussian_process import kernels
+from sklearn.gaussian_process import kernels, GaussianProcessRegressor
 from romnet.model import Model
 from romnet.model import BilinearModel
 from romnet.model import NetworkROM
 from romnet.model import LiftedROM
-from romnet.model import GaussianProcessROM
 from romnet.autoencoder import ProjAE
 import pytest
 
@@ -225,11 +224,13 @@ def test_subspace_rom(pitchfork):
 
 
 def test_gaussian_process_rom(pitchfork, autoencoder, network_rom):
-    kernel = kernels.Matern()
     # test Gaussian process reduced-order model for a function from R to R
+    kernel1 = kernels.Matern()
+    gp1 = GaussianProcessRegressor(kernel=kernel1)
     inputdata = np.linspace(-5, 5, 40).reshape(-1, 1)
     outputdata = np.array([network_rom.rhs(z) for z in inputdata])
-    gp_rom = GaussianProcessROM(inputdata, outputdata, kernel)
+    gp1.fit(inputdata, outputdata)
+    gp_rom = Model(gp1.predict)
     testdata = np.linspace(-5, 5, 14).reshape(-1, 1)
     directoutput = np.array([network_rom.rhs(z)
                             for z in testdata])
@@ -237,12 +238,15 @@ def test_gaussian_process_rom(pitchfork, autoencoder, network_rom):
     percentError = (romoutput - directoutput) / directoutput
     assert np.max(percentError) <= 0.1
     # test Gaussian process reduced-order model for a function from R^2 to R^2
+    kernel2 = kernels.Matern()
+    gp2 = GaussianProcessRegressor(kernel=kernel2)
     x1pts_train = np.linspace(-5, 5, 40)
     inputdata = np.array([[x1, x2] for x1 in x1pts_train
                          for x2 in x1pts_train])
     outputdata = np.array([autoencoder.d_autoenc(x, pitchfork.rhs(x))[1]
                           .detach().numpy() for x in inputdata])
-    gp_rom = GaussianProcessROM(inputdata, outputdata, kernel)
+    gp2.fit(inputdata, outputdata)
+    gp_rom = Model(gp2.predict)
     x1pts_test = np.linspace(-5, 5, 14)
     testdata = np.array([[x1, x2] for x1 in x1pts_test for x2 in x1pts_test])
     directoutput = np.array([autoencoder.d_autoenc(x, pitchfork.rhs(x))[1]
