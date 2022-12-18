@@ -225,9 +225,10 @@ class Model(abc.ABC):
     def rhs(self, x):
         """Return the right-hand-side of the ODE x' = f(x)."""
 
-    @abc.abstractmethod
     def adjoint_rhs(self, x, v):
         """For the right-hand-side function f(x), return Df(x)^T v."""
+        raise NotImplementedError("Adjoint not implemented for class %s" %
+                                  self.__class__.__name__)
 
     def output(self, x):
         """
@@ -347,7 +348,7 @@ class BilinearModel(SemiLinearModel):
         return BilinearModel(c, L, B)
 
 
-class LinearLiftedROM(Model):
+class LiftedROM(Model):
     """
     A reduced-order model that projects the dynamics onto linear subspaces
 
@@ -366,38 +367,36 @@ class LinearLiftedROM(Model):
     def __init__(self, model, V, W=None):
         self.model = model
         self.V = V
-        numstates = len(V)
+        n = len(V)
         if W is None:
             W = V
-        assert len(W) == numstates
+        assert len(W) == n
 
         # Let W1 = (W V')^{-1} W
-        G = W @ V.T
+        G = np.array([[np.dot(W[i], V[j]) for j in range(n)]
+                      for i in range(n)])
         self.W1 = np.linalg.solve(G, W)
         # Now projection is given by P = V' W1, and W1 V' = Identity
 
     def rhs(self, z):
-        return self.W1 @ self.model.rhs(self.V.T @ z)
-
-    def adjoint_rhs(self, x, v):
-        return -1
+        fx = self.model.rhs(self.V.T @ z)
+        return np.array([np.dot(self.W1[i], fx) for i in range(len(self.W1))])
 
 
-class NetworkLiftedROM(Model):
+class NetworkROM(Model):
     """
-    A reduced-order model that projects the dynamics onto the tangent space
-    of a nonlinear manifold defined by the range of a romnet neural network.
+    A reduced-order model that projects onto the range of a romnet autoencoder
 
-    Torch gradient information is not preserved.
+    Torch gradient information is not preserved
 
     The rom neural network is a differentiable idempotent operator
-    P(x) = psid(psie(x)) = psid(z).
+    P(x) = psid(psie(x)), where z = psie(x)
 
     The reduced-order model in state space is given by
-    xdot = DP(x)f(x).
+    xdot = DP(x)f(x)
 
     The reduced-order model in the latent space is given by
-    zdot = Dpsie(psid(z))f(psid(z)).
+    zdot = Dpsie(psid(z))f(psid(z))
     """
 
     def __init__(self, model, autoencoder):
@@ -410,19 +409,15 @@ class NetworkLiftedROM(Model):
             _, v = self.autoencoder.d_enc(x, self.model.rhs(x))
             return v.numpy()
 
-    def adjoint_rhs(self, x, v):
-        return -1
-
 
 class GaussianProcessROM(Model):
     """
-    A reduced-order model that approximates a given
-    systems right-hand side by Gaussian process regression.
+    A surrogate reduced-order model described by Gaussian process regression
 
-    Let z = f(z) be the function we wish to approximate.
+    Let zdot = f(z) be the function we wish to approximate
 
     The Gaussian process reduced-order model is a function
-    g(z) ~= f(z) determined by Gaussian process regression.
+    g(z) ~= f(z) = zdot  determined by Gaussian process regression
     """
 
     def __init__(self, inputdata, outputdata, kernel=None):
@@ -433,6 +428,3 @@ class GaussianProcessROM(Model):
 
     def rhs(self, x):
         return self.gp.predict(x)
-
-    def adjoint_rhs(self, x, v):
-        return -1

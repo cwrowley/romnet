@@ -2,8 +2,8 @@ import numpy as np
 from sklearn.gaussian_process import kernels
 from romnet.model import Model
 from romnet.model import BilinearModel
-from romnet.model import NetworkLiftedROM
-from romnet.model import LinearLiftedROM
+from romnet.model import NetworkROM
+from romnet.model import LiftedROM
 from romnet.model import GaussianProcessROM
 from romnet.autoencoder import ProjAE
 import pytest
@@ -146,7 +146,7 @@ class Pitchfork(Model):
     Two asymptotically stable fixed points at (-a, a^2), (a, a^2)
     One unstable fixed point at (0,0)
 
-    a controls the fix point locations
+    a controls the fixed point locations
     lam controls the speed of fast dynamics
 
     Slow manifold near critical manifold of {(x,y) : y = x^2}
@@ -171,84 +171,73 @@ class Pitchfork(Model):
 
 
 @pytest.fixture
-def pitchfork_model():
+def pitchfork():
     return Pitchfork()
 
 
 @pytest.fixture
-def pitchfork_autoencoder():
+def autoencoder():
     """
-    Return an untrained romnet autoencoder with latent dimension
-    equal to the state dimension.
-
-    If dims = [2,2], the autoencoder weights will be initialized
-    such that the autoencoder is the identity as is written in
-    the ProjAE class in autoencoder.py
-
-    Thus, P = Id and DP = Id on R^2.
+    Return an untrained romnet autoencoder with dims = [2, 2, 1]
     """
-    dims = [2, 2]
+    dims = [2, 2, 1]
     return ProjAE(dims)
 
 
-def test_pitchfork_autoencoder(pitchfork_autoencoder):
-    x = np.random.randn(2)
-    v = np.random.randn(2)
-    assert x == pytest.approx(pitchfork_autoencoder(x).detach().numpy())
-    _, dP = pitchfork_autoencoder.d_autoenc(x, v)
-    assert v == pytest.approx(dP.detach().numpy())
-
-
 @pytest.fixture
-def pitchfork_network_lifted_rom(pitchfork_model, pitchfork_autoencoder):
-    return NetworkLiftedROM(pitchfork_model, pitchfork_autoencoder)
+def network_rom(pitchfork, autoencoder):
+    return NetworkROM(pitchfork, autoencoder)
 
 
-def test_pitchfork_network_lifted_rom(pitchfork_model, pitchfork_autoencoder,
-                                      pitchfork_network_lifted_rom):
+def test_network_rom(pitchfork, autoencoder, network_rom):
     x = np.random.randn(2)
-    v1 = pitchfork_model.rhs(x)
-    z = pitchfork_autoencoder.enc(x)
-    vv = pitchfork_network_lifted_rom.rhs(z)
-    _, v2 = pitchfork_autoencoder.d_dec(z, vv)
-    assert v1 == pytest.approx(v2.detach().numpy())
-
-
-def test_pitchfork_linear_lifted_rom(pitchfork_model):
-    Phi_T = np.array([[1, 0]])
-    Psi_T = np.array([[1, 0]])
-    rom = LinearLiftedROM(pitchfork_model, Phi_T, Psi_T)
-    x = np.random.randn(2)
-    z = Psi_T @ x
-    directoutput = Psi_T @ pitchfork_model.rhs(Phi_T.T @ z)
-    romoutput = rom.rhs(z)
+    z = autoencoder.enc(x)
+    Px = autoencoder(x).detach().numpy()
+    _, directoutput = autoencoder.d_autoenc(Px, pitchfork.rhs(Px))
+    directoutput = directoutput.detach().numpy()
+    rom_z = network_rom.rhs(z)
+    _, romoutput = autoencoder.d_dec(z, rom_z)
+    romoutput = romoutput.detach().numpy()
     assert directoutput == pytest.approx(romoutput)
 
 
-def test_pitchfork_gaussian_process_rom(pitchfork_network_lifted_rom):
+def test_subspace_rom(pitchfork):
+    Phi_T = np.array([[1, 0]])
+    Psi_T = np.array([[1, 0]])
+    rom = LiftedROM(pitchfork, Phi_T, Psi_T)
+    x = np.random.randn(2)
+    z = Psi_T @ x
+    directoutput = Psi_T @ pitchfork.rhs(Phi_T.T @ z)
+    romoutput = rom.rhs(z)
+    assert directoutput == pytest.approx(romoutput)
+    directoutput = Phi_T.T @ directoutput
+    romoutput = Phi_T.T @ romoutput
+    assert directoutput == pytest.approx(romoutput)
+
+
+def test_gaussian_process_rom(pitchfork, autoencoder, network_rom):
     kernel = kernels.Matern()
-
-    def squaregrid(halfboxlength, numpts):
-        xpts = np.linspace(-halfboxlength, halfboxlength, numpts)
-        temp = [np.vstack((xpts[0]*np.ones_like(xpts), xpts))]
-        for i in range(len(xpts)-1):
-            temp.append(np.vstack((xpts[i+1]*np.ones_like(xpts), xpts)))
-        return np.hstack(temp).T
-
-    inputdata = squaregrid(5, 40)
-
-    def rowwise_function_eval(func, data):
-        dataout = np.zeros_like(data)
-        for i in range(data.shape[0]):
-            dataout[i, :] = func(data[i, :])
-        return dataout
-
-    outputdata = rowwise_function_eval(pitchfork_network_lifted_rom.rhs,
-                                       inputdata)
-    rom = GaussianProcessROM(inputdata, outputdata, kernel)
-    testdata = squaregrid(5, 14)
-    directoutput = rowwise_function_eval(pitchfork_network_lifted_rom.rhs,
-                                         testdata)
-    romoutput = rom.rhs(testdata)
+    # test Gaussian process reduced-order model for a function from R to R
+    inputdata = np.linspace(-5, 5, 40).reshape(-1, 1)
+    outputdata = np.array([network_rom.rhs(z) for z in inputdata])
+    gp_rom = GaussianProcessROM(inputdata, outputdata, kernel)
+    testdata = np.linspace(-5, 5, 14).reshape(-1, 1)
+    directoutput = np.array([network_rom.rhs(z)
+                            for z in testdata])
+    romoutput = gp_rom.rhs(testdata)
+    percentError = (romoutput - directoutput) / directoutput
+    assert np.max(percentError) <= 0.1
+    # test Gaussian process reduced-order model for a function from R^2 to R^2
+    x1pts_train = np.linspace(-5, 5, 40)
+    inputdata = np.array([[x1, x2] for x1 in x1pts_train
+                         for x2 in x1pts_train])
+    outputdata = np.array([autoencoder.d_autoenc(x, pitchfork.rhs(x))[1]
+                          .detach().numpy() for x in inputdata])
+    gp_rom = GaussianProcessROM(inputdata, outputdata, kernel)
+    x1pts_test = np.linspace(-5, 5, 14)
+    testdata = np.array([[x1, x2] for x1 in x1pts_test for x2 in x1pts_test])
+    directoutput = np.array([autoencoder.d_autoenc(x, pitchfork.rhs(x))[1]
+                            .detach().numpy() for x in testdata])
+    romoutput = gp_rom.rhs(testdata)
     percentError = (romoutput - directoutput) / directoutput
     assert np.max(percentError) <= 0.1
