@@ -70,5 +70,52 @@ def compare_timesteppers():
     plt.show()
 
 
+def generate_data():
+    model = CGL()
+    dt = 0.5
+    model.set_stepper(dt, method="rk3cn")
+
+    num_train = 1
+    num_test = 1
+
+    t_final = 500
+    n = int(t_final / dt) + 1
+
+    # generating trajectories
+    print("Generating training trajectories...")
+    training_traj = romnet.sample(model.step, model.random_ic, num_train, n)
+    test_traj = romnet.sample(model.step, model.random_ic, num_test, n)
+    training_traj.save("cgl_train.traj")
+    test_traj.save("cgl_test.traj")
+
+    # sampling gradients
+    s = 32  # samples per trajectory
+    L = 15  # horizon for gradient sampling
+    print("Sampling gradients...")
+    training_data, Y = romnet.sample_gradient(training_traj, model, s, L,
+                                              CoBRAS_style=True)
+    test_data = romnet.sample_gradient(test_traj, model, s, L)
+    print("Done")
+
+    # CoBRAS
+    X = training_data.X
+    U, s, VH = np.linalg.svd(np.dot(Y, X.T), full_matrices=False,
+                             compute_uv=True)
+    r = 10
+    Phi = np.dot(X.T, VH[:r, :].T) / np.sqrt(s[:r])
+    Psi = np.dot(Y.T, U[:, :r]) / np.sqrt(s[:r])
+    with open("cgl.cobras", 'wb') as fp:
+        pickle.dump((Phi, Psi), fp, pickle.HIGHEST_PROTOCOL)
+
+    # CoBRAS Projected GradientDataset
+    training_data.X = training_data.X @ Psi
+    training_data.G = training_data.G @ Phi
+    test_data.X = test_data.X @ Psi
+    test_data.G = test_data.G @ Phi
+    training_data.save("cgl_train.dat")
+    test_data.save("cgl_test.dat")
+
+
 if __name__ == "__main__":
-    compare_timesteppers()
+    # compare_timesteppers()
+    generate_data()

@@ -36,6 +36,10 @@ class TrajectoryList:
     def __getitem__(self, i):
         return self.data[i]
 
+    def save(self, fname):
+        with open(fname, 'wb') as fp:
+            pickle.dump(self, fp, pickle.HIGHEST_PROTOCOL)
+
 
 class GradientDataset:
     def __init__(self, X, G):
