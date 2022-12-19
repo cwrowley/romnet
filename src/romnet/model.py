@@ -233,6 +233,38 @@ class Model:
         cls = Timestepper.lookup(method)
         self.stepper = cls(dt)
 
+    def project(self, V, W=None):
+        """
+        Returns a reduced-order model that projects onto linear subspaces
+
+        Rows of V determine the subspace to project onto
+        Rows of W determine the direction of projection
+
+        That is, the projection is given by
+            V' (WV')^{-1} W
+
+        The number of states in the reduced-order model is the number of rows
+        in V (or W).
+
+        If W is not specified, it is assumed W = V
+        """
+        n = len(V)
+        if W is None:
+            W = V
+        assert len(W) == n
+
+        # Let W1 = (W V')^{-1} W
+        G = np.array([[np.dot(W[i], V[j]) for j in range(n)]
+                     for i in range(n)])
+        W1 = np.linalg.solve(G, W)
+        # Now projection is given by P = V' W1, and W1 V' = Identity
+
+        def rom_rhs(z):
+            fx = self.rhs(V.T @ z)
+            return np.array([np.dot(W1[i], fx) for i in range(len(W1))])
+
+        return Model(rom_rhs)
+
 
 class SemiLinearModel(Model):
     """Abstract base class for semi-linear models.
@@ -371,41 +403,6 @@ class BilinearModel(SemiLinearModel):
                        for j in range(n)]
                       for i in range(n)])
         return BilinearModel(c, L, B)
-
-
-class LiftedROM(Model):
-    """
-    A reduced-order model that projects the dynamics onto linear subspaces
-
-    Rows of V determine the subspace to project onto
-    Rows of W determine the direction of projection
-
-    That is, the projection is given by
-        V' (WV')^{-1} W
-
-    The number of states in the reduced-order model is the number of rows
-    in V (or W).
-
-    If W is not specified, it is assumed W = V
-    """
-
-    def __init__(self, model, V, W=None):
-        self.model = model
-        self.V = V
-        n = len(V)
-        if W is None:
-            W = V
-        assert len(W) == n
-
-        # Let W1 = (W V')^{-1} W
-        G = np.array([[np.dot(W[i], V[j]) for j in range(n)]
-                      for i in range(n)])
-        self.W1 = np.linalg.solve(G, W)
-        # Now projection is given by P = V' W1, and W1 V' = Identity
-
-    def rhs(self, z):
-        fx = self.model.rhs(self.V.T @ z)
-        return np.array([np.dot(self.W1[i], fx) for i in range(len(self.W1))])
 
 
 class NetworkROM(Model):

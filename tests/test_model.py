@@ -3,7 +3,6 @@ from sklearn.gaussian_process import kernels, GaussianProcessRegressor
 from romnet.model import Model
 from romnet.model import BilinearModel
 from romnet.model import NetworkROM
-from romnet.model import LiftedROM
 from romnet.autoencoder import ProjAE
 import pytest
 
@@ -209,10 +208,10 @@ def test_network_rom(pitchfork, autoencoder, network_rom):
     assert directoutput == pytest.approx(romoutput)
 
 
-def test_subspace_rom(pitchfork):
+def test_project_rom(pitchfork):
     Phi_T = np.array([[1, 0]])
     Psi_T = np.array([[1, 0]])
-    rom = LiftedROM(pitchfork, Phi_T, Psi_T)
+    rom = pitchfork.project(Phi_T, Psi_T)
     x = np.random.randn(2)
     z = Psi_T @ x
     directoutput = Psi_T @ pitchfork.rhs(Phi_T.T @ z)
