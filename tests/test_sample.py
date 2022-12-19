@@ -61,6 +61,8 @@ def test_sample():
     s = 3  # samples per trajectory
     L = 5  # horizon for gradient sampling
     batch_size = 7
+
+    # test gradient sampling default
     grad_data = sample_gradient(data, model, s, L)
     assert len(grad_data) == num_traj * s
     dataloader = torch.utils.data.DataLoader(grad_data, batch_size=batch_size,
@@ -68,6 +70,20 @@ def test_sample():
     X, G = next(iter(dataloader))
     assert X.shape == torch.Size([batch_size, dim])
     assert G.shape == torch.Size([batch_size, dim])
+
+    # test gradient sampling with CoBRAS_style=True
+    grad_data, Y = sample_gradient(data, model, s, L, CoBRAS_style=True)
+    assert len(grad_data) == num_traj * s
+    assert grad_data.X.shape == Y.shape
+
+    # test gradient sampling with long_traj=True
+    grad_data = sample_gradient(data, model, s, L, long_traj=True)
+    # note, len(grad_data) in this case will be random.
+
+    # test gradient sampling with CoBRAS_style=True and long_traj=True
+    grad_data, Y = sample_gradient(data, model, s, L, long_traj=True,
+                                   CoBRAS_style=True)
+    assert grad_data.X.shape == Y.shape
 
 
 if __name__ == "__main__":
