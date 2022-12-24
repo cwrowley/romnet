@@ -4,6 +4,7 @@ __pycache__
 *.aux
 *.synctex.gz
 notes/cobras.pdf
+notes/ks.pdf
 examples/*.dat
 .vscode/settings.json
-/notes/ks.pdf
+doc/build/
