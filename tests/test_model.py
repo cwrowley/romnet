@@ -1,5 +1,8 @@
 import numpy as np
+from romnet.model import Model
 from romnet.model import BilinearModel
+from romnet.model import NetworkROM
+from romnet.autoencoder import ProjAE
 import pytest
 
 
@@ -137,3 +140,82 @@ def test_stepper(example1):
     example1.set_stepper(dt, method="rk2cn")
     x = np.array([1, 1, 1])
     example1.step(x)
+
+
+class Pitchfork(Model):
+    """
+    Example pitchfork bifurcation model in two dimensions.
+
+    xdot = x(a^2 - x^2)
+    ydot = lam * (x^2 - y)
+
+    Two asymptotically stable fixed points at (-a, a^2), (a, a^2)
+    One unstable fixed point at (0,0)
+
+    a controls the fixed point locations
+    lam controls the speed of fast dynamics
+
+    Slow manifold near critical manifold of {(x,y) : y = x^2}
+    """
+
+    def __init__(self, a=1., lam=10.):
+        self.a = a
+        self.lam = lam
+
+    def rhs(self, x):
+        xdot = x[0] * (self.a**2 - x[0]**2)
+        ydot = self.lam * (x[0]**2 - x[1])
+        return np.array([xdot, ydot])
+
+    def jac(self, x):
+        df1 = [self.a**2 - 3 * x[0]**2, 0]
+        df2 = [2 * self.lam * x[0], -self.lam]
+        return np.array([df1, df2])
+
+    def adjoint_rhs(self, x, v):
+        return self.jac(x).T @ v
+
+
+@pytest.fixture
+def pitchfork():
+    return Pitchfork()
+
+
+@pytest.fixture
+def autoencoder():
+    """
+    Return an untrained romnet autoencoder with dims = [2, 2, 1]
+    """
+    dims = [2, 2, 1]
+    return ProjAE(dims)
+
+
+@pytest.fixture
+def network_rom(pitchfork, autoencoder):
+    return NetworkROM(pitchfork, autoencoder)
+
+
+def test_network_rom(pitchfork, autoencoder, network_rom):
+    x = np.random.randn(2)
+    z = autoencoder.enc(x)
+    Px = autoencoder(x).detach().numpy()
+    _, directoutput = autoencoder.d_autoenc(Px, pitchfork.rhs(Px))
+    directoutput = directoutput.detach().numpy()
+    rom_z = network_rom.rhs(z)
+    _, romoutput = autoencoder.d_dec(z, rom_z)
+    romoutput = romoutput.detach().numpy()
+    assert directoutput == pytest.approx(romoutput)
+
+
+def test_project_rom(pitchfork):
+    Phi_T = np.array([[1, 0]])
+    Psi_T = np.array([[1, 0]])
+    rom = pitchfork.project(Phi_T, Psi_T)
+    x = np.random.randn(2)
+    z = Psi_T @ x
+    directoutput = Psi_T @ pitchfork.rhs(Phi_T.T @ z)
+    romoutput = rom.rhs(z)
+    assert directoutput == pytest.approx(romoutput)
+    directoutput = Phi_T.T @ directoutput
+    romoutput = Phi_T.T @ romoutput
+    assert directoutput == pytest.approx(romoutput)

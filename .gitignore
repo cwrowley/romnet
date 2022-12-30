@@ -5,3 +5,4 @@ __pycache__
 *.synctex.gz
 notes/cobras.pdf
 examples/*.dat
+.vscode/settings.json
