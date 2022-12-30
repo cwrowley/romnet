@@ -260,7 +260,8 @@ class Model:
         # Now projection is given by P = V' W1, and W1 V' = Identity
 
         def rom_rhs(z):
-            fx = self.rhs(V.T @ z)
+            x = sum((mode * c for mode, c in zip(V, z)))
+            fx = self.rhs(x)
             return np.array([np.dot(W1[i], fx) for i in range(len(W1))])
 
         return Model(rom_rhs)
