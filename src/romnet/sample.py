@@ -1,7 +1,7 @@
 import numpy as np
 import pickle
 
-__all__ = ["sample", "sample_gradient", "load"]
+__all__ = ["sample", "sample_gradient", "load", "sample_gradient_long_traj"]
 
 
 class TrajectoryList:
@@ -84,22 +84,13 @@ def sample(step, random_state, num_traj, n):
     return TrajectoryList(traj_list)
 
 
-def sample_gradient(traj_list, model, samples_per_traj, L,
-                    long_traj=False, CoBRAS_style=False):
+def sample_gradient(traj_list, model, samples_per_traj, L):
     """
-    Gradient sampling
+    Gradient sampling using the standard method
 
-    Running this method with default settings uses the adjoint sampling method
-    seen in Section 3 of the CoBRAS paper (long_traj = False). Additionally,
-    this method will output a GradientDataset, which is compatible with
-    PyTorch's dataloader.
-
-    If long_traj = True, then Algorithm 3.1 in the CoBRAS paper is used.
-
-    If CoBRAS_style = True, then this method returns a tuple. The first element
-    is the GradientDataset. The second element is the gradient matrix Y. Note,
-    Y depends the truth value of long_traj. See Equation 3.7 and Algorithm 3.1
-    in the CoBRAS paper.
+    This method conducts the adjoint sampling method discussed in Section 3 of
+    the CoBRAS paper. Additionally, this method will output a GradientDataset,
+    which is compatible with PyTorch's dataloader.
 
     traj_list is a list of trajectories (e.g., TrajectoryList object)
     adj_step(x, v) advances the adjoint variable v at state x
@@ -109,46 +100,61 @@ def sample_gradient(traj_list, model, samples_per_traj, L,
     X = list()
     G = list()
     N = traj_list.n  # num pts in each trajectory
-    if long_traj is False:
-        for k, x in enumerate(traj_list.traj):
-            for j in range(samples_per_traj):
-                # choose a time t in [0..N-1-L]
-                t = np.random.randint(N - L)
-                # choose a tau in [0..L]
-                tau = np.random.randint(L + 1)
-                # choose random direction eta for gradient
-                eta = np.sqrt(L + 1) * np.random.randn(model.output_dim)
-                lam = model.adjoint_output(x[t + tau], eta)
-                for i in range(1, tau):
-                    lam = model.adjoint_step(x[t + tau - i], lam)
-                X.append(x[t])
-                G.append(lam)
-        if CoBRAS_style is False:
-            return GradientDataset(X, G)
-        else:
-            Y = np.array(G) / np.sqrt(len(G))
-            return GradientDataset(X, G), Y
-    else:
-        Y = list()
-        for k, x in enumerate(traj_list.traj):
-            for j in range(samples_per_traj):
-                t = np.random.randint(N - L)
-                tau = np.random.randint(L + 1)
-                eta = np.sqrt(L + 1) * np.random.randn(model.output_dim)
-                tau_min = np.max((0, t + tau - (N - L - 1)))
-                tau_max = np.min((L, t + tau))
-                nu = 1 + tau_max - tau_min
-                X_rev = list()
-                Lam = list()
-                X_rev.append(x[t + tau])
-                Lam.append(model.adjoint_output(x[t + tau], eta))
-                for i in range(1, tau_max):
-                    X_rev.append(x[t + tau - i])
-                    Lam.append(model.adjoint_step(x[t + tau - i], Lam[i - 1]))
-                X.extend(X_rev[tau_min:tau_max])
-                G.extend(Lam[tau_min:tau_max])
-                Y.extend(Lam[tau_min:tau_max] / np.sqrt(nu))
-        if CoBRAS_style is False:
-            return GradientDataset(X, G)
-        else:
-            return GradientDataset(X, G), np.array(Y)
+    for k, x in enumerate(traj_list.traj):
+        for j in range(samples_per_traj):
+            # choose a time t in [0..N-1-L]
+            t = np.random.randint(N - L)
+            # choose a tau in [0..L]
+            tau = np.random.randint(L + 1)
+            # choose random direction eta for gradient
+            eta = np.sqrt(L + 1) * np.random.randn(model.output_dim)
+            lam = model.adjoint_output(x[t + tau], eta)
+            for i in range(1, tau):
+                lam = model.adjoint_step(x[t + tau - i], lam)
+            X.append(x[t])
+            G.append(lam)
+    return GradientDataset(X, G)
+
+
+def sample_gradient_long_traj(traj_list, model, samples_per_traj, L):
+    """
+    Gradient sampling using the method of long trajectories
+
+    This method conducts the adjoint sampling method discussed in Algorithm 3.1
+    of the CoBRAS paper. Additionally, this method will output a
+    GradientDataset, which is compatible with PyTorch's dataloader.
+
+    This method returns a tuple: (GradientDataset, D). GradientDataset is
+    an GradientDataset object and D is a column array of scaling factors taking
+    the form 1/sqrt(1 - tau_max - tau_min) given in Algorithm 3.1 of the CoBRAS
+    paper. The matrix Y in Algorithm 3.1 can be computed using D:
+    Y = D * GradientDataset.G.
+
+    traj_list is a list of trajectories (e.g., TrajectoryList object)
+    adj_step(x, v) advances the adjoint variable v at state x
+    samples_per_traj is the number of gradient samples for each trajectory
+    L is the horizon used for advancing the adjoint variable
+    """
+    X = list()
+    G = list()
+    D = list()
+    N = traj_list.n  # num pts in each trajectory
+    for k, x in enumerate(traj_list.traj):
+        for j in range(samples_per_traj):
+            t = np.random.randint(N - L)
+            tau = np.random.randint(L + 1)
+            eta = np.sqrt(L + 1) * np.random.randn(model.output_dim)
+            tau_min = np.max((0, t + tau - (N - L - 1)))
+            tau_max = np.min((L, t + tau))
+            nu = 1 + tau_max - tau_min
+            X_ = list()
+            Lam = list()
+            X_.append(x[t + tau])
+            Lam.append(model.adjoint_output(x[t + tau], eta))
+            for i in range(1, tau_max):
+                X_.append(x[t + tau - i])
+                Lam.append(model.adjoint_step(x[t + tau - i], Lam[i - 1]))
+            X.extend(X_[tau_min:tau_max])
+            G.extend(Lam[tau_min:tau_max])
+            D.extend([1 / np.sqrt(nu)] * len(Lam[tau_min:tau_max]))
+    return GradientDataset(X, G), np.array(D).reshape(-1, 1)
