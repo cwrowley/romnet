@@ -1,5 +1,4 @@
 import numpy as np
-from sklearn.gaussian_process import kernels, GaussianProcessRegressor
 from romnet.model import Model
 from romnet.model import BilinearModel
 from romnet.model import NetworkROM
