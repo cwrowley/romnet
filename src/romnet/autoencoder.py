@@ -3,7 +3,7 @@ from torch import nn
 import numpy as np
 from scipy.stats import ortho_group
 
-__all__ = ["ProjAE", "GAP_loss"]
+__all__ = ["ProjAE", "GAP_loss", "reduced_GAP_loss"]
 
 # for better compatibility with numpy arrays
 torch.set_default_dtype(torch.float64)
@@ -147,6 +147,15 @@ class ProjAE(nn.Module):
             total_regularizer += layer.regularizer()
         return total_regularizer
 
+    def save(self, fname):
+        torch.save(self, fname)
 
-def GAP_loss(Xpred, X, G):
-    return torch.mean(torch.square(torch.sum(G * (Xpred - X), dim=1)))
+
+def GAP_loss(X_pred, X_G):
+    return torch.mean(torch.square(torch.sum(X_G[1] *
+                                             (X_pred - X_G[0]), dim=1)))
+
+
+def reduced_GAP_loss(Xi_pred, Xi_Gam_a):
+    return torch.mean(torch.square(Xi_Gam_a[2]
+                                   - torch.sum(Xi_Gam_a[1] * Xi_pred, dim=1)))

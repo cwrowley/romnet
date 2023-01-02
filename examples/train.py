@@ -7,6 +7,7 @@ import romnet
 
 
 def train_autoencoder(basename):
+
     # load data
     print(f"Loading data from {basename}_train.dat")
     training_data = romnet.load(basename + "_train.dat")
@@ -16,12 +17,14 @@ def train_autoencoder(basename):
     learning_rate = 1.e-3
     batch_size = 64
     num_epochs = 50
-    dims = [3, 3, 3, 3, 3, 2]
+    dims = [15, 15, 15, 15, 15, 14]
     autoencoder = romnet.ProjAE(dims)
     gamma = 1.e-3
 
-    def loss_fn(Xpred, X, G):
-        return romnet.GAP_loss(Xpred, X, G) + gamma * autoencoder.regularizer()
+    def loss_fn(Xi_pred, Xi_Gam_a):
+        loss = romnet.reduced_GAP_loss(Xi_pred, Xi_Gam_a)
+        reg = gamma * autoencoder.regularizer()
+        return loss + reg
     optimizer = torch.optim.Adam(autoencoder.parameters(), lr=learning_rate)
     train_dataloader = DataLoader(training_data,
                                   batch_size=batch_size, shuffle=True)
@@ -32,6 +35,8 @@ def train_autoencoder(basename):
         print(f"Epoch {t+1}\n-----------------")
         romnet.train_loop(train_dataloader, autoencoder, loss_fn, optimizer)
         romnet.test_loop(test_dataloader, autoencoder, loss_fn)
+
+    autoencoder.save(basename + ".romnet")
 
 
 if __name__ == "__main__":
