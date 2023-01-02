@@ -92,28 +92,19 @@ def generate_data():
     s = 32  # samples per trajectory
     L = 15  # horizon for gradient sampling
     print("Sampling gradients...")
-    training_data, Y = romnet.sample_gradient(training_traj, model, s, L,
-                                              CoBRAS_style=True)
+    training_data = romnet.sample_gradient(training_traj, model, s, L)
     test_data = romnet.sample_gradient(test_traj, model, s, L)
     print("Done")
 
-    # CoBRAS
-    X = training_data.X
-    U, s, VH = np.linalg.svd(np.dot(Y, X.T), full_matrices=False,
-                             compute_uv=True)
-    r = 10
-    Phi = np.dot(X.T, VH[:r, :].T) / np.sqrt(s[:r])
-    Psi = np.dot(Y.T, U[:, :r]) / np.sqrt(s[:r])
-    with open("cgl.cobras", 'wb') as fp:
-        pickle.dump((Phi, Psi), fp, pickle.HIGHEST_PROTOCOL)
-
-    # CoBRAS Projected GradientDataset
-    training_data.X = training_data.X @ Psi
-    training_data.G = training_data.G @ Phi
-    test_data.X = test_data.X @ Psi
-    test_data.G = test_data.G @ Phi
-    training_data.save("cgl_train.dat")
-    test_data.save("cgl_test.dat")
+    # CoBRASReducedGradientDataset
+    cobras = romnet.CoBRAS(training_data.X, training_data.G, 15)
+    cobras.save_projectors("cgl.cobras")
+    reduced_training_data = cobras.generate_gradient_dataset(training_data.X,
+                                                             training_data.G)
+    reduced_testing_data = cobras.generate_gradient_dataset(test_data.X,
+                                                            test_data.G)
+    reduced_training_data.save("cgl_train.dat")
+    reduced_testing_data.save("cgl_test.dat")
 
 
 if __name__ == "__main__":
