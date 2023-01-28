@@ -8,3 +8,4 @@ notes/ks.pdf
 examples/*.dat
 .vscode/settings.json
 doc/build/
+doc/source/generated/

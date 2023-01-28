@@ -169,10 +169,27 @@ class SemiLinearModel(Model):
 
 
 class LUSolver:
+    """A class for solving linear systems A x = b
+
+    Args:
+        mat(array): the matrix A
+
+    When instantiated, an LU factorization of A is computed, and this is
+    used when solving the system for a given right-hand side b.
+    """
+
     def __init__(self, mat):
         self.LU = lu_factor(mat)
 
     def __call__(self, rhs):
+        """Solve the system A x = rhs for x
+
+        Args:
+            rhs(array): the right-hand side of the equation to be solved
+
+        Returns:
+            The solution x
+        """
         return lu_solve(self.LU, rhs)
 
 
@@ -180,8 +197,15 @@ class BilinearModel(SemiLinearModel):
     """Model where the right-hand side is a bilinear function of the state
 
     Models have the form
+
         x' = c + L x + B(x, x)
+
     where B is bilinear
+
+    Args:
+        c(array_like): vector containing the constant terms c
+        L(array_like): matrix containing the linear map L
+        B(array_like): rank-3 tensor describing the bilinear map B
     """
 
     def __init__(self, c, L, B):
@@ -209,19 +233,29 @@ class BilinearModel(SemiLinearModel):
         return w
 
     def project(self, V, W=None):
-        """
-        Return a reduced-order model by projecting onto linear subspaces
+        """Return a reduced-order model by projecting onto linear subspaces
 
-        Rows of V determine the subspace to project onto
-        Rows of W determine the direction of projection
+        Rows of V determine the subspace to project onto, and
+        rows of W determine the direction of projection
 
         That is, the projection is given by
-          V' (WV')^{-1} W
+
+        .. math:: V^T (WV^T)^{-1} W
 
         The number of states in the reduced-order model is the number of rows
         in V (or W).
 
-        If W is not specified, it is assumed W = V
+        Args:
+            V(list): List of modes to project onto.
+                The model is projected onto a subspace spanned by the elements
+                of this list.
+            W(list): List of adjoint modes.
+                The nullspace of the projection is the orthogonal complement
+                of the subspace spanned by the elements of W.
+                If not specified, an orthogonal projection is used (W = V)
+
+        Returns:
+            A :class:`BilinearModel` containing the desired projection
         """
         n = len(V)
         if W is None:

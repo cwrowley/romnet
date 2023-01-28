@@ -10,6 +10,21 @@ Welcome to romnet's documentation!
    :maxdepth: 2
    :caption: Contents:
 
+.. automodule:: romnet
+   :no-members:
+   :no-inherited-members:
+
+.. currentmodule:: romnet
+
+Model classes
+=============
+.. autosummary::
+   :toctree: generated/
+
+   Model
+   SemiLinearModel
+   BilinearModel
+   LUSolver
 
 
 Indices and tables
