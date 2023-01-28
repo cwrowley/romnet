@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 """model - Define how a given state evolves in time."""
 
 import abc
