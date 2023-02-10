@@ -92,8 +92,10 @@ def generate_data():
     s = 32  # samples per trajectory
     L = 15  # horizon for gradient sampling
     print("Sampling gradients...")
-    training_data = romnet.sample_gradient(training_traj, model, s, L)
-    test_data = romnet.sample_gradient(test_traj, model, s, L)
+    training_data, _ = romnet.sample_gradient_long_traj(training_traj, model,
+                                                        s, L)
+    test_data, _ = romnet.sample_gradient_long_traj(test_traj, model,
+                                                    s, L)
     print("Done")
 
     # CoBRASReducedGradientDataset
