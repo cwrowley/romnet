@@ -107,7 +107,7 @@ def sample_gradient(traj_list, model, samples_per_traj, L):
             # choose a tau in [0..L]
             tau = np.random.randint(L + 1)
             # choose random direction eta for gradient
-            eta = np.sqrt(L + 1) * np.random.randn(model.output_dim)
+            eta = np.sqrt(L + 1) * np.random.randn(model.num_outputs)
             lam = model.adjoint_output(x[t + tau], eta)
             for i in range(1, tau):
                 lam = model.adjoint_step(x[t + tau - i], lam)
@@ -143,7 +143,7 @@ def sample_gradient_long_traj(traj_list, model, samples_per_traj, L):
         for j in range(samples_per_traj):
             t = np.random.randint(N - L)
             tau = np.random.randint(L + 1)
-            eta = np.sqrt(L + 1) * np.random.randn(model.output_dim)
+            eta = np.sqrt(L + 1) * np.random.randn(model.num_outputs)
             tau_min = np.max((0, t + tau - (N - L - 1)))
             tau_max = np.min((L, t + tau))
             nu = 1 + tau_max - tau_min

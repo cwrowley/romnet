@@ -1,7 +1,5 @@
 """model - Define how a given state evolves in time."""
 
-import abc
-
 import numpy as np
 import torch
 from scipy.linalg import lu_factor, lu_solve
@@ -14,14 +12,12 @@ __all__ = ["Model", "SemiLinearModel", "BilinearModel", "LUSolver"]
 class Model:
     """
     Class defining an ODE dx/dt = f(x)
-
-    The constructor requires we input the right-hand side of the ODE, x' = f(x)
-    The right-hand side method is called rhs(x)
     """
 
-    def __init__(self, rhs, adjoint_rhs=None, output=None,
+    def __init__(self, rhs=None, adjoint_rhs=None, output=None,
                  adjoint_output=None):
-        setattr(self, "rhs", rhs)
+        if rhs is not None:
+            setattr(self, "rhs", rhs)
         if adjoint_rhs is not None:
             setattr(self, "adjoint_rhs", adjoint_rhs)
         if adjoint_rhs is not None:
@@ -116,7 +112,6 @@ class SemiLinearModel(Model):
     def linear(self, x):
         return self._linear.dot(x)
 
-    @abc.abstractmethod
     def nonlinear(self, x):
         pass
 
