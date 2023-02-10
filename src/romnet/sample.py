@@ -85,17 +85,25 @@ def sample(step, random_state, num_traj, n):
 
 
 def sample_gradient(traj_list, model, samples_per_traj, L):
-    """
-    Gradient sampling using the standard method
+    """This method conducts gradient sampling using the standard method
+        discussed in Section 3 of [1].
 
-    This method conducts the adjoint sampling method discussed in Section 3 of
-    the CoBRAS paper. Additionally, this method will output a GradientDataset,
-    which is compatible with PyTorch's dataloader.
+        Args:
+            traj_list(TrajectoryList): a data structure that is used to define
+                a list of trajectories.
+            model(Model): the dynamical system being sampled.
+            samples_per_traj(int): the number of gradient samples calculated
+                per trajectory.
+            L(int): the time horizon used for advancing the adjoint variable.
 
-    traj_list is a list of trajectories (e.g., TrajectoryList object)
-    adj_step(x, v) advances the adjoint variable v at state x
-    samples_per_traj is the number of gradient samples for each trajectory
-    L is the horizon used for advancing the adjoint variable
+        Returns:
+            GradientDataset(GradientDataset): State and gradient data structure
+                compatible with PyTorch's dataloader.
+
+        References:
+            [1] Otto, S.E., Padovan, A. and Rowley, C.W., 2022. Model Reduction
+                for Nonlinear Systems by Balanced Truncation of State and
+                Gradient Covariance.
     """
     X = list()
     G = list()
@@ -117,23 +125,29 @@ def sample_gradient(traj_list, model, samples_per_traj, L):
 
 
 def sample_gradient_long_traj(traj_list, model, samples_per_traj, L):
-    """
-    Gradient sampling using the method of long trajectories
+    """This method conducts gradient sampling using the method of long
+        trajectories discussed in Algorithm 3.1 of [1].
 
-    This method conducts the adjoint sampling method discussed in Algorithm 3.1
-    of the CoBRAS paper. Additionally, this method will output a
-    GradientDataset, which is compatible with PyTorch's dataloader.
+        Args:
+            traj_list (TrajectoryList): a data structure that is used to define
+                a list of trajectories.
+            model (Model): the dynamical system being sampled.
+            samples_per_traj (int): the number of gradient samples calculated
+                per trajectory.
+            L (int): the time horizon used for advancing the adjoint variable.
 
-    This method returns a tuple: (GradientDataset, D). GradientDataset is
-    an GradientDataset object and D is a column array of scaling factors taking
-    the form 1/sqrt(1 - tau_max - tau_min) given in Algorithm 3.1 of the CoBRAS
-    paper. The matrix Y in Algorithm 3.1 can be computed using D:
-    Y = D * GradientDataset.G.
+        Returns:
+            GradientDataset (GradientDataset): State and gradient data
+                structure compatible with PyTorch's dataloader.
+            D (ndarray): vector of scaling factors taking the form
+                1/sqrt(1 - tau_max - tau_min) given in Algorithm 3.1 of [1].
+                The matrix Y in Algorithm 3.1 can be computed using D:
+                Y = D * GradientDataset.G.
 
-    traj_list is a list of trajectories (e.g., TrajectoryList object)
-    adj_step(x, v) advances the adjoint variable v at state x
-    samples_per_traj is the number of gradient samples for each trajectory
-    L is the horizon used for advancing the adjoint variable
+        References:
+            [1] Otto, S.E., Padovan, A. and Rowley, C.W., 2022. Model Reduction
+                for Nonlinear Systems by Balanced Truncation of State and
+                Gradient Covariance.
     """
     X = list()
     G = list()

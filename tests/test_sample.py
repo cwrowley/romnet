@@ -4,8 +4,6 @@ from romnet.sample import TrajectoryList
 from romnet import Model
 import torch
 
-__all__ = ["sample", "sample_gradient", "sample_gradient_long_traj"]
-
 
 class MyModel(Model):
     def __init__(self, dim=1, debug=False):
