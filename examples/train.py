@@ -7,7 +7,6 @@ import romnet
 
 
 def train_autoencoder(basename):
-
     # load data
     print(f"Loading data from {basename}_train.dat")
     training_data = romnet.load(basename + "_train.dat")
