@@ -20,8 +20,8 @@ def train_autoencoder(basename):
     autoencoder = romnet.ProjAE(dims)
     gamma = 1.e-3
 
-    def loss_fn(Xi_pred, Xi_Gam_a):
-        loss = romnet.reduced_GAP_loss(Xi_pred, Xi_Gam_a)
+    def loss_fn(Xi_pred, X, G, XdotG):
+        loss = romnet.reduced_GAP_loss(Xi_pred, X, G, XdotG)
         reg = gamma * autoencoder.regularizer()
         return loss + reg
     optimizer = torch.optim.Adam(autoencoder.parameters(), lr=learning_rate)
