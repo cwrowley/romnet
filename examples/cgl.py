@@ -98,13 +98,13 @@ def generate_data():
                                                     s, L)
     print("Done")
 
-    # CoBRASReducedGradientDataset
-    cobras = romnet.CoBRAS(training_data.X, training_data.G, 15)
+    # ProjectedGradientDataset
+    cobras = romnet.CoBRAS(training_data.X, training_data.G)
     cobras.save_projectors("cgl.cobras")
-    reduced_training_data = cobras.generate_gradient_dataset(training_data.X,
-                                                             training_data.G)
-    reduced_testing_data = cobras.generate_gradient_dataset(test_data.X,
-                                                            test_data.G)
+    rank = 15
+    reduced_training_data = cobras.project(training_data.X, training_data.G,
+                                           rank)
+    reduced_testing_data = cobras.project(test_data.X, test_data.G, rank)
     reduced_training_data.save("cgl_train.dat")
     reduced_testing_data.save("cgl_test.dat")
 

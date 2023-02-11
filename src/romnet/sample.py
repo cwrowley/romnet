@@ -89,16 +89,16 @@ def sample_gradient(traj_list, model, samples_per_traj, L):
         discussed in Section 3 of [1].
 
         Args:
-            traj_list(TrajectoryList): a data structure that is used to define
+            traj_list (TrajectoryList): a data structure that is used to define
                 a list of trajectories.
-            model(Model): the dynamical system being sampled.
-            samples_per_traj(int): the number of gradient samples calculated
+            model (Model): the dynamical system being sampled.
+            samples_per_traj (int): the number of gradient samples calculated
                 per trajectory.
-            L(int): the time horizon used for advancing the adjoint variable.
+            L (int): the time horizon used for advancing the adjoint variable.
 
         Returns:
-            GradientDataset(GradientDataset): State and gradient data structure
-                compatible with PyTorch's dataloader.
+            GradientDataset (GradientDataset): State and gradient data
+                structure compatible with PyTorch's dataloader.
 
         References:
             [1] Otto, S.E., Padovan, A. and Rowley, C.W., 2022. Model Reduction
