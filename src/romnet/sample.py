@@ -85,25 +85,26 @@ def sample(step, random_state, num_traj, n):
 
 
 def sample_gradient(traj_list, model, samples_per_traj, L):
-    """This method conducts gradient sampling using the standard method
-        discussed in Section 3 of [1].
+    """Sample the gradient using the standard method discussed in Section 3 of
+    [1].
 
-        Args:
-            traj_list (TrajectoryList): a data structure that is used to define
-                a list of trajectories.
-            model (Model): the dynamical system being sampled.
-            samples_per_traj (int): the number of gradient samples calculated
-                per trajectory.
-            L (int): the time horizon used for advancing the adjoint variable.
+    Args:
+        traj_list (TrajectoryList): data structure that is used to define a
+            list of trajectories.
+        model (Model): dynamical system being sampled.
+        samples_per_traj (int): number of gradient samples calculated
+            per trajectory.
+        L (int): time horizon used for advancing the adjoint variable.
 
-        Returns:
-            GradientDataset (GradientDataset): State and gradient data
-                structure compatible with PyTorch's dataloader.
+    Returns:
+        GradientDataset: State and gradient data structure
+        compatible with PyTorch's dataloader. GradientDataset.X[i] is the ith
+        state sample and GradientDataset.G[i] is the ith gradient sample.
 
-        References:
-            [1] Otto, S.E., Padovan, A. and Rowley, C.W., 2022. Model Reduction
-                for Nonlinear Systems by Balanced Truncation of State and
-                Gradient Covariance.
+    References:
+        [1] Otto, S.E., Padovan, A. and Rowley, C.W., 2022. Model Reduction
+        for Nonlinear Systems by Balanced Truncation of State and
+        Gradient Covariance.
     """
     X = list()
     G = list()
@@ -125,29 +126,36 @@ def sample_gradient(traj_list, model, samples_per_traj, L):
 
 
 def sample_gradient_long_traj(traj_list, model, samples_per_traj, L):
-    """This method conducts gradient sampling using the method of long
-        trajectories discussed in Algorithm 3.1 of [1].
+    """Sample the gradient using the method of long trajectories discussed in
+    Algorithm 3.1 of [1].
 
-        Args:
-            traj_list (TrajectoryList): a data structure that is used to define
-                a list of trajectories.
-            model (Model): the dynamical system being sampled.
-            samples_per_traj (int): the number of gradient samples calculated
-                per trajectory.
-            L (int): the time horizon used for advancing the adjoint variable.
+    Args:
+        traj_list (TrajectoryList): data structure that is used to define a
+            list of trajectories.
+        model (Model): dynamical system being sampled.
+        samples_per_traj (int): number of gradient samples calculated
+            per trajectory.
+        L (int): time horizon used for advancing the adjoint variable.
 
-        Returns:
+    Returns:
+        tuple:
             GradientDataset (GradientDataset): State and gradient data
-                structure compatible with PyTorch's dataloader.
-            D (ndarray): vector of scaling factors taking the form
-                1/sqrt(1 - tau_max - tau_min) given in Algorithm 3.1 of [1].
-                The matrix Y in Algorithm 3.1 can be computed using D:
-                Y = D * GradientDataset.G.
+            structure compatible with PyTorch's dataloader.
+            GradientDataset.X[i] is the ith state sample and
+            GradientDataset.G[i] is the ith gradient sample.
 
-        References:
-            [1] Otto, S.E., Padovan, A. and Rowley, C.W., 2022. Model Reduction
-                for Nonlinear Systems by Balanced Truncation of State and
-                Gradient Covariance.
+            D (ndarray): Vector of scaling factors, D, taking the form
+
+            .. math:: \\frac{1}{\\sqrt{1 - \\tau_{max} - \\tau_{min}}}
+
+            given in Algorithm 3.1 of [1]. The
+            matrix Y in Algorithm 3.1 can be computed using
+            Y = D * GradientDataset.G.
+
+    References:
+        [1] Otto, S.E., Padovan, A. and Rowley, C.W., 2022. Model Reduction
+        for Nonlinear Systems by Balanced Truncation of State and
+        Gradient Covariance.
     """
     X = list()
     G = list()

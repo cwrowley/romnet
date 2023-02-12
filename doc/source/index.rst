@@ -25,7 +25,9 @@ Model classes
    SemiLinearModel
    BilinearModel
    LUSolver
-
+   sample_gradient
+   sample_gradient_long_traj
+   CoBRAS
 
 Indices and tables
 ==================
