@@ -54,7 +54,33 @@ class ProjectedGradientDataset:
 
 
 class CoBRAS:
+    """Calculate and store the linear projection associated with Theorem 2.3 in
+    [1].
+
+    Attributes:
+        U (ndarray): Matrix of left singular vectors.
+        s (array): Array of singular values.
+        VH (ndarray): Matrix of right singular vectors conjugate transpose.
+        Phi (ndarray): Matrix of direct modes.
+        Psi (ndarray): Matrix of adjoint modes.
+
+    References:
+        [1] Otto, S.E., Padovan, A. and Rowley, C.W., 2022. Model Reduction
+        for Nonlinear Systems by Balanced Truncation of State and
+        Gradient Covariance.
+    """
+
     def __init__(self, X, Y):
+        """Calculate U, s, VH, Phi, and Psi.
+
+        Args:
+            X (ndarray): state sample matrix where X[i] is the ith state sample.
+            Y (ndarray): gradient sample matrix where Y[i] is ith gradient
+                sample.
+
+        Note:
+            The X and Y used here are the transposes of X and Y in [1].
+        """
         self.U, self.s, self.VH = np.linalg.svd(np.dot(Y, X.T),
                                                 full_matrices=False,
                                                 compute_uv=True)
@@ -62,13 +88,41 @@ class CoBRAS:
         self.Psi = np.dot(Y.T, self.U) / np.sqrt(self.s)
 
     def projectors(self):
-        return self.Phi.T, self.Psi.T
+        """Return Phi and Psi."""
+        return self.Phi, self.Psi
 
     def save_projectors(self, fname):
+        """Save the tuple (Phi, Psi)."""
         with open(fname, 'wb') as fp:
             pickle.dump((self.Phi, self.Psi), fp, pickle.HIGHEST_PROTOCOL)
 
     def project(self, X, G, rank):
+        """Project the gradient and state samples onto the direct modes, Phi,
+        and adjoint modes, Psi.
+
+        Args:
+            X (ndarray): non-normalized state sample matrix where X[i] is the
+                ith state sample.
+            G (ndarray): non-normalized gradient sample matrix where G[i] is
+                the ith gradient sample.
+            rank (int): the number of leading direct and adjoint modes used.
+
+        Returns:
+            ProjectedGradientDataset: A data structure of gradient and state
+            samples projected onto the direct and adjoint modes. This data
+            structure is compatible with PyTorch's dataloader. In particular,
+            if `x` and `g` are state and gradient samples, then
+
+            .. math:: \\xi = \\Psi^T x, \\quad \\gamma = \\Phi^T g, \\quad a =
+                \\langle x, g \\rangle
+
+            represent the projected state, projected gradient, and
+            state-gradient inner product, respectfully.
+            ProjectedGradientDataset.X[i], ProjectedGradientDataset.G[i], and
+            ProjectedGradientDataset.XdotG[i] are the ith projected
+            state, projected gradient, and state-gradient inner product,
+            respectfully.
+        """
         XdotG = np.array([np.dot(x, g) for x, g in zip(X, G)])
         Xproj = X @ self.Psi[:, :rank]
         Gproj = G @ self.Phi[:, :rank]
