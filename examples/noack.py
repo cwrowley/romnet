@@ -7,9 +7,14 @@ from romnet.models import NoackModel
 
 
 def random_ic():
-    xmax = 4
-    zmin = -4
-    zmax = 4
+    # Old code used these values for test trajectory visualization and error  -
+    # calculation
+    # xmax = 1.5
+    # zmin = -1.5
+    # zmax = 1.5
+    xmax = 6
+    zmin = -6
+    zmax = 6
     x = xmax * (2 * np.random.rand() - 1)
     y = xmax * (2 * np.random.rand() - 1)
     z = zmin + (zmax - zmin) * np.random.rand()
@@ -22,16 +27,16 @@ def generate_data():
     model.set_stepper(dt, method="rk2", nsteps=5)
 
     # generate trajectories for training/testing
-    num_train = 1024
-    num_test = 64
-    n = 30  # length of each trajectory
+    num_train = 1000
+    num_test = 64 # Old code used 1000                                        -
+    n = 200  # length of each trajectory
     print("Generating training trajectories...")
     training_traj = romnet.sample(model.step, random_ic, num_train, n)
     test_traj = romnet.sample(model.step, random_ic, num_test, n)
 
     # sample gradients for GAP loss
-    s = 32  # samples per trajectory
-    L = 15  # horizon for gradient sampling
+    s = 10  # samples per trajectory
+    L = 20  # horizon for gradient sampling
     print("Sampling gradients...")
     training_data = romnet.sample_gradient(training_traj, model, s, L)
     test_data = romnet.sample_gradient(test_traj, model, s, L)
