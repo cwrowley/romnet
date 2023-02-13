@@ -96,6 +96,10 @@ class CGL(SemiLinearModel):
         return 2 * self.nx
 
     @property
+    def num_outputs(self):
+        return 2 * self.nx
+
+    @property
     def gamma(self):
         return 1.0 + 1j * self.cd
 
