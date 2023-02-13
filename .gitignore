@@ -9,3 +9,8 @@ examples/*.dat
 .vscode/settings.json
 doc/build/
 doc/source/generated/
+noack_train.dat
+noack_train.traj
+noack_test.dat
+noack_test.traj
+noack.romnet

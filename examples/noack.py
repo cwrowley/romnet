@@ -28,18 +28,20 @@ def generate_data():
 
     # generate trajectories for training/testing
     num_train = 1000
-    num_test = 64 # Old code used 1000                                        -
+    num_test = 64  # Old code used 1000                                        -
     n = 200  # length of each trajectory
     print("Generating training trajectories...")
     training_traj = romnet.sample(model.step, random_ic, num_train, n)
     test_traj = romnet.sample(model.step, random_ic, num_test, n)
+    training_traj.save("noack_train.traj")
+    test_traj.save("noack_test.traj")
 
     # sample gradients for GAP loss
     s = 10  # samples per trajectory
     L = 20  # horizon for gradient sampling
     print("Sampling gradients...")
-    training_data = romnet.sample_gradient(training_traj, model, s, L)
-    test_data = romnet.sample_gradient(test_traj, model, s, L)
+    training_data, _ = romnet.sample_gradient_long_traj(training_traj, model, s, L)
+    test_data, _ = romnet.sample_gradient_long_traj(test_traj, model, s, L)
     print("Done")
 
     training_data.save("noack_train.dat")
