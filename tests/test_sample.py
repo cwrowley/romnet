@@ -11,6 +11,10 @@ class MyModel(Model):
         self.state_dim = dim
         self.output_dim = dim
 
+    @property
+    def num_outputs(self):
+        return 2
+
     def rhs(self, x):
         if self.debug:
             print(f"  rhs({x})")
