@@ -34,3 +34,18 @@ class NoackModel(Model):
 
     def adjoint_rhs(self, x, v):
         return self.jac(x).T @ v
+
+    def slow_manifold(self, r):
+        h0 = r**2
+        h1 = - 2 * r**2 * (self.A * r**2 + self.mu)
+        h2 = 4 * r**2 * (3 * self.A**2 * r**4 + 4 * self.A * r**2 * self.mu +
+                         self.mu**2)
+        h3 = -8 * r**2 * (14 * self.A**3 * r**6 + 24 * self.A**2 * r**4 *
+                          self.mu + 11 * self.A * r**2 * self.mu**2 +
+                          self.mu**3)
+        h4 = 16 * r**2 * (85 * self.A**4 * r**8 + 180 * self.A**3 *
+                          r**6 * self.mu + 120 * self.A**2 * r**4 *
+                          self.mu**2 + 26 * self.A * r**2 * self.mu**3
+                          + self.mu**4)
+        return (h0 + h1 * (1/self.lam) + h2 * (1/self.lam)**2 +
+                h3 * (1/self.lam)**3 + h4 * (1/self.lam)**4)

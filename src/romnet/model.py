@@ -6,7 +6,8 @@ from scipy.linalg import lu_factor, lu_solve
 
 from .timestepper import SemiImplicit, Timestepper
 
-__all__ = ["Model", "SemiLinearModel", "BilinearModel", "LUSolver"]
+__all__ = ["Model", "SemiLinearModel", "BilinearModel", "LUSolver",
+           "NetworkROM"]
 
 
 class Model:
