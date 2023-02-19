@@ -13,5 +13,5 @@ noack_train.dat
 noack_train.traj
 noack_test.dat
 noack_test.traj
-noack.romnet
-noack_rom.traj
+.ipynb_checkpoints
+initial_weights
