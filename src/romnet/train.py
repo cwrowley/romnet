@@ -1,4 +1,5 @@
 import pickle
+from typing import Tuple
 
 import numpy as np
 import torch
@@ -49,7 +50,7 @@ class ProjectedGradientDataset:
     def __len__(self) -> int:
         return self.X.shape[0]
 
-    def __getitem__(self, i: int) -> tuple[Vector, Vector, Vector]:
+    def __getitem__(self, i: int) -> Tuple[Vector, Vector, Vector]:
         return self.X[i], self.G[i], self.XdotG[i]
 
     def save(self, fname: str) -> None:
@@ -91,7 +92,7 @@ class CoBRAS:
         self.Phi = np.dot(X.T, self.VH.T) / np.sqrt(self.s)
         self.Psi = np.dot(Y.T, self.U) / np.sqrt(self.s)
 
-    def projectors(self) -> tuple[NDArray[np.float64], NDArray[np.float64]]:
+    def projectors(self) -> Tuple[NDArray[np.float64], NDArray[np.float64]]:
         """Return Phi and Psi."""
         return self.Phi, self.Psi
 

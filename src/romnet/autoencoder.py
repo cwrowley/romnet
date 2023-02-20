@@ -1,4 +1,4 @@
-from typing import Optional, Union
+from typing import List, Optional, Tuple, Union
 
 import numpy as np
 import torch
@@ -108,7 +108,7 @@ class ProjAE(nn.Module):
     The autoencoder is built from a sequence of LayerPair objects
     """
 
-    def __init__(self, dims: list[int]):
+    def __init__(self, dims: List[int]):
         super().__init__()
         self.dims = dims
         self.num_layers = len(dims) - 1
@@ -132,7 +132,7 @@ class ProjAE(nn.Module):
             xout = layer.dec(xout)
         return xout
 
-    def d_enc(self, x: TVector, v: TVector) -> tuple[Tensor, Tensor]:
+    def d_enc(self, x: TVector, v: TVector) -> Tuple[Tensor, Tensor]:
         xout = torch.as_tensor(x)
         vout = torch.as_tensor(v)
         for layer in self.layers:
@@ -140,7 +140,7 @@ class ProjAE(nn.Module):
             xout = layer.enc(xout)
         return xout, vout
 
-    def d_dec(self, x: TVector, v: TVector) -> tuple[Tensor, Tensor]:
+    def d_dec(self, x: TVector, v: TVector) -> Tuple[Tensor, Tensor]:
         xout = torch.as_tensor(x)
         vout = torch.as_tensor(v)
         for layer in reversed(self.layers):
@@ -148,7 +148,7 @@ class ProjAE(nn.Module):
             xout = layer.dec(xout)
         return xout, vout
 
-    def d_autoenc(self, x: TVector, v: TVector) -> tuple[Tensor, Tensor]:
+    def d_autoenc(self, x: TVector, v: TVector) -> Tuple[Tensor, Tensor]:
         z, vz = self.d_enc(x, v)
         return self.d_dec(z, vz)
 

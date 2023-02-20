@@ -1,5 +1,5 @@
 import pickle
-from typing import Any, Callable
+from typing import Any, Callable, Tuple
 
 import numpy as np
 from numpy.typing import ArrayLike, NDArray
@@ -47,7 +47,7 @@ class TrajectoryList(Dataset[Vector]):
             pickle.dump(self, fp, pickle.HIGHEST_PROTOCOL)
 
 
-class GradientDataset(Dataset[tuple[Vector, Vector]]):
+class GradientDataset(Dataset[Tuple[Vector, Vector]]):
     def __init__(self, X: ArrayLike, G: ArrayLike):
         self.X = np.array(X)
         self.G = np.array(G)
@@ -55,7 +55,7 @@ class GradientDataset(Dataset[tuple[Vector, Vector]]):
     def __len__(self) -> int:
         return self.X.shape[0]
 
-    def __getitem__(self, i: int) -> tuple[Vector, Vector]:
+    def __getitem__(self, i: int) -> Tuple[Vector, Vector]:
         return self.X[i], self.G[i]
 
     def save(self, fname: str) -> None:
@@ -148,7 +148,7 @@ def sample_gradient_long_traj(
     num_outputs: int,
     samples_per_traj: int,
     L: int,
-) -> tuple[GradientDataset, NDArray[np.float64]]:
+) -> Tuple[GradientDataset, NDArray[np.float64]]:
     """Sample the gradient using the method of long trajectories discussed in
     Algorithm 3.1 of [1].
 

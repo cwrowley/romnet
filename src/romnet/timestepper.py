@@ -1,7 +1,7 @@
 """timestepper - step ordinary differential equations forward in time"""
 
 import abc
-from typing import Callable, Type
+from typing import Callable, Dict, List, Type
 
 from .typing import Vector, VectorField
 
@@ -12,7 +12,7 @@ class Timestepper(abc.ABC):
     """Abstract base class for timesteppers."""
 
     # registry for subclasses, mapping names to constructors
-    __registry: dict[str, Type["Timestepper"]] = {}
+    __registry: Dict[str, Type["Timestepper"]] = {}
 
     def __init_subclass__(cls) -> None:
         name = cls.__name__.lower()
@@ -34,7 +34,7 @@ class Timestepper(abc.ABC):
         """Advance the state x by one timestep, for the ODE x' = rhs(x)."""
 
     @classmethod
-    def methods(cls) -> list[str]:
+    def methods(cls) -> List[str]:
         return list(cls.__registry.keys())
 
 
@@ -42,7 +42,7 @@ class SemiImplicit(abc.ABC):
     """Abstract base class for semi-implicit timesteppers."""
 
     # registry for subclasses, mapping names to constructors
-    __registry: dict[str, Type["SemiImplicit"]] = {}
+    __registry: Dict[str, Type["SemiImplicit"]] = {}
 
     def __init_subclass__(cls) -> None:
         name = cls.__name__.lower()
@@ -89,7 +89,7 @@ class SemiImplicit(abc.ABC):
         """Advance the state forward by one step"""
 
     @classmethod
-    def methods(cls) -> list[str]:
+    def methods(cls) -> List[str]:
         return list(cls.__registry.keys())
 
 

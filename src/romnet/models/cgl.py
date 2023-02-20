@@ -1,6 +1,6 @@
 """Complex Ginzburg-Landau model"""
 
-from typing import Callable
+from typing import Callable, List, Tuple
 
 import numpy as np
 from numpy.typing import NDArray
@@ -12,7 +12,7 @@ from ..typing import Vector
 __all__ = ["CGL"]
 
 
-def herdif(N: int, order: int) -> tuple[NDArray[np.float64], list[NDArray[np.float64]]]:  # noqa: C901
+def herdif(N: int, order: int) -> Tuple[NDArray[np.float64], List[NDArray[np.float64]]]:  # noqa: C901
     # define collocation points
     x_coll, _ = roots_hermite(N)
 
@@ -114,7 +114,7 @@ class CGL(SemiLinearModel):
     def mu(self, x: NDArray[np.float64]) -> NDArray[np.float64]:
         return self.mu0 - self.cu**2 + 0.5 * self.mu2 * x**2
 
-    def _construct_matrices(self) -> tuple[NDArray[np.float64], NDArray[np.float64], NDArray[np.float64], NDArray[np.float64]]:
+    def _construct_matrices(self) -> Tuple[NDArray[np.float64], NDArray[np.float64], NDArray[np.float64], NDArray[np.float64]]:
         # collocation points and differentiation operators
         xi, Dxi_mats = herdif(self.nx, 2)
         # quadrature weights
