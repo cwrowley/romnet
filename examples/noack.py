@@ -71,7 +71,7 @@ def rom(train_num=""):
         z_rom_traj.save("noack" + train_num + "_rom.traj")
 
 
-def test(train_num="", savefig=False):
+def test_rom(train_num="", savefig=False):
     # loading data
     print("Loading test trajectories...")
     test_traj = romnet.load("noack_test.traj")
@@ -207,8 +207,8 @@ if __name__ == "__main__":
             rom()
     elif sys.argv[1] == "test":
         if len(sys.argv) == 3:
-            test("_" + sys.argv[2])
+            test_rom("_" + sys.argv[2])
         elif (len(sys.argv) == 4) and (sys.argv[3] == "savefig"):
-            test("_" + sys.argv[2], savefig=True)
+            test_rom("_" + sys.argv[2], savefig=True)
         else:
-            test()
+            test_rom()
