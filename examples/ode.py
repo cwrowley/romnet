@@ -38,17 +38,17 @@ def bilinear_example(beta):
 
 
 def simulate(scheme, model, x0, Tmax, xf):
-    npts = 2**np.arange(5, 11)
+    npts = 2 ** np.arange(5, 11)
     plt.figure()
     prev_err = 0
     for n in npts:
-        x = np.zeros((n+1, model.state_dim))
+        x = np.zeros((n + 1, model.state_dim))
         dt = Tmax / n
         step = model.get_stepper(dt, method=scheme)
         x[0] = x0
         for i in range(n):
-            x[i+1] = step(x[i])
-        plt.plot(dt * np.arange(n+1), x[:, 0], label=f"n = {n}")
+            x[i + 1] = step(x[i])
+        plt.plot(dt * np.arange(n + 1), x[:, 0], label=f"n = {n}")
         err = x[n] - xf
         err = np.sqrt(np.dot(err, err))
         print("  %6d  %12g  %2.5f" % (n, err, prev_err / err))

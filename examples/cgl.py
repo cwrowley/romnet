@@ -4,10 +4,9 @@ import time
 
 import matplotlib.pyplot as plt
 import numpy as np
-from scipy.integrate import solve_ivp
-
 import romnet
 from romnet.models import CGL
+from scipy.integrate import solve_ivp
 
 
 def compare_timesteppers():
@@ -49,12 +48,14 @@ def compare_timesteppers():
     print(f"Elapsed time for {method2} = {toc - tic}")
 
     tic = time.time()
-    sol = solve_ivp(lambda _, q: model.rhs(q),
-                    # jac=lambda t, q: model.jac(q),
-                    t_span=[0, t_final],
-                    y0=q0,
-                    t_eval=t3,
-                    method='BDF')
+    sol = solve_ivp(
+        lambda _, q: model.rhs(q),
+        # jac=lambda t, q: model.jac(q),
+        t_span=[0, t_final],
+        y0=q0,
+        t_eval=t3,
+        method="BDF",
+    )
     toc = time.time()
     print(f"Elapsed time for solve_ivp = {toc - tic}")
 
@@ -93,18 +94,19 @@ def generate_data():
     L = 15  # horizon for gradient sampling
     adj_step = model.get_adjoint_stepper(dt, method="rk3cn")
     print("Sampling gradients...")
-    training_data, _ = romnet.sample_gradient_long_traj(training_traj, adj_step,
-                                                        model.adjoint_output, model.num_outputs, s, L)
-    test_data, _ = romnet.sample_gradient_long_traj(test_traj, adj_step,
-                                                    model.adjoint_output, model.num_outputs, s, L)
+    training_data, _ = romnet.sample_gradient_long_traj(
+        training_traj, adj_step, model.adjoint_output, model.num_outputs, s, L
+    )
+    test_data, _ = romnet.sample_gradient_long_traj(
+        test_traj, adj_step, model.adjoint_output, model.num_outputs, s, L
+    )
     print("Done")
 
     # ProjectedGradientDataset
     cobras = romnet.CoBRAS(training_data.X, training_data.G)
     cobras.save_projectors("cgl.cobras")
     rank = 15
-    reduced_training_data = cobras.project(training_data.X, training_data.G,
-                                           rank)
+    reduced_training_data = cobras.project(training_data.X, training_data.G, rank)
     reduced_testing_data = cobras.project(test_data.X, test_data.G, rank)
     reduced_training_data.save("cgl_train.dat")
     reduced_testing_data.save("cgl_test.dat")

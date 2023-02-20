@@ -1,14 +1,18 @@
 """Complex Ginzburg-Landau model"""
 
+from typing import Callable
+
 import numpy as np
+from numpy.typing import NDArray
 from scipy.special import eval_hermite, gammaln, roots_hermite
 
-from .. import SemiLinearModel, LUSolver
+from .. import LUSolver, SemiLinearModel
+from ..typing import Vector
 
 __all__ = ["CGL"]
 
 
-def herdif(N, order):  # noqa: C901
+def herdif(N: int, order: int) -> tuple[NDArray[np.float64], list[NDArray[np.float64]]]:  # noqa: C901
     # define collocation points
     x_coll, _ = roots_hermite(N)
 
@@ -78,8 +82,8 @@ class CGL(SemiLinearModel):
     Complex Ginzburg-Landau model
     """
 
-    def __init__(self, nx=220, U=2.0, cu=0.2, cd=-1.0,
-                 mu0=0.41, mu2=-0.01, a=0.1):
+    def __init__(self, nx: int = 220, U: float = 2.0, cu: float = 0.2, cd: float = -1.0,
+                 mu0: float = 0.41, mu2: float = -0.01, a: float = 0.1):
         self.nx = nx
         self.U = U
         self.cu = cu
@@ -92,25 +96,25 @@ class CGL(SemiLinearModel):
         self.C = self._construct_output()
 
     @property
-    def num_states(self):
+    def num_states(self) -> int:
         return 2 * self.nx
 
     @property
-    def num_outputs(self):
+    def num_outputs(self) -> int:
         return self.C.shape[0]
 
     @property
-    def gamma(self):
+    def gamma(self) -> complex:
         return 1.0 + 1j * self.cd
 
     @property
-    def chi(self):
+    def chi(self) -> float:
         return np.power(np.absolute(self.mu2 / (2 * self.gamma)), 0.25)
 
-    def mu(self, x):
+    def mu(self, x: NDArray[np.float64]) -> NDArray[np.float64]:
         return self.mu0 - self.cu**2 + 0.5 * self.mu2 * x**2
 
-    def _construct_matrices(self):
+    def _construct_matrices(self) -> tuple[NDArray[np.float64], NDArray[np.float64], NDArray[np.float64], NDArray[np.float64]]:
         # collocation points and differentiation operators
         xi, Dxi_mats = herdif(self.nx, 2)
         # quadrature weights
@@ -139,21 +143,21 @@ class CGL(SemiLinearModel):
         A = np.vstack([np.hstack([Arr, Ari]), np.hstack([Air, Aii])])
         return A, w_quad, xi, x
 
-    def linear(self, x):
+    def linear(self, x: Vector) -> Vector:
         return self._linear @ x
 
-    def adjoint(self, x):
+    def adjoint(self, x: Vector) -> Vector:
         return self._linear.T @ x
 
-    def get_solver(self, alpha):
+    def get_solver(self, alpha: float) -> Callable[[Vector], Vector]:
         mat = np.eye(self.num_states) - alpha * self._linear
         return LUSolver(mat)
 
-    def get_adjoint_solver(self, alpha):
+    def get_adjoint_solver(self, alpha: float) -> Callable[[Vector], Vector]:
         mat = np.eye(self.num_states) - alpha * self._linear.T
         return LUSolver(mat)
 
-    def _construct_output(self):
+    def _construct_output(self) -> NDArray[np.float64]:
         # observation kernel defined by eqn. 4.1 in M. Ilak et al.
         # branch_2 is downstream bound of unstable region
         branch_2 = np.sqrt(-2 * (self.mu0 - np.square(self.cu)) / self.mu2)
@@ -167,13 +171,13 @@ class CGL(SemiLinearModel):
         C[1, self.nx:] = ker_obs * np.sqrt(self.weights)
         return C
 
-    def output(self, q):
+    def output(self, q: Vector) -> Vector:
         return np.dot(self.C, q)
 
-    def adjoint_output(self, _, v):
+    def adjoint_output(self, _: Vector, v: Vector) -> Vector:
         return np.dot(self.C.T, v)
 
-    def nonlinear(self, q):
+    def nonlinear(self, q: Vector) -> Vector:
         # real and imaginary parts in original state space
         nx = self.nx
         qr = q[:nx]
@@ -186,7 +190,7 @@ class CGL(SemiLinearModel):
         f[nx:] = q_sq * qi
         return -self.a * f
 
-    def adjoint_nonlinear(self, q, v):
+    def adjoint_nonlinear(self, q: Vector, v: Vector) -> Vector:
         """Adjoint of nonlinear term linearized about q, in direction v."""
         # real and imaginary parts of v in Euclidean state space
         nx = self.nx
@@ -203,7 +207,7 @@ class CGL(SemiLinearModel):
         adjoint[nx:] = 2 * qr * qi * vr + (3 * qi**2 + qr**2) * vi
         return -self.a * adjoint
 
-    def random_ic(self, num_modes=10, amplitude=0.01):
+    def random_ic(self, num_modes: int = 10, amplitude: float = 0.01) -> Vector:
         # Use random coefficients on Gaussian Hermite functions
         Psi_vals = np.array([psi_fun(n, self.xi) for n in range(num_modes)]).T
         B_IC = np.zeros((self.num_states, 2 * num_modes))
@@ -216,7 +220,7 @@ class CGL(SemiLinearModel):
         return q0
 
 
-def psi_fun(n, x):
+def psi_fun(n: int, x: NDArray[np.float64]) -> NDArray[np.float64]:
     if n < 201:
         Hn = eval_hermite(n, x)
         z = np.square(x) + n * np.log(2) + gammaln(n + 1)

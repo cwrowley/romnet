@@ -1,6 +1,10 @@
-import torch
-import numpy as np
 import pickle
+
+import numpy as np
+import torch
+from numpy.typing import ArrayLike, NDArray
+
+from .typing import Vector
 
 __all__ = ["train_loop", "test_loop", "CoBRAS"]
 
@@ -24,7 +28,7 @@ def train_loop(dataloader, autoencoder, loss_fn, optimizer):
 
 def test_loop(dataloader, autoencoder, loss_fn):
     num_batches = len(dataloader)
-    loss = 0
+    loss = 0.0
 
     with torch.no_grad():
         for data_tuple in dataloader:
@@ -37,19 +41,19 @@ def test_loop(dataloader, autoencoder, loss_fn):
 
 
 class ProjectedGradientDataset:
-    def __init__(self, X, G, XdotG):
+    def __init__(self, X: ArrayLike, G: ArrayLike, XdotG: ArrayLike):
         self.X = np.array(X)
         self.G = np.array(G)
         self.XdotG = np.array(XdotG)
 
-    def __len__(self):
+    def __len__(self) -> int:
         return self.X.shape[0]
 
-    def __getitem__(self, i):
+    def __getitem__(self, i: int) -> tuple[Vector, Vector, Vector]:
         return self.X[i], self.G[i], self.XdotG[i]
 
-    def save(self, fname):
-        with open(fname, 'wb') as fp:
+    def save(self, fname: str) -> None:
+        with open(fname, "wb") as fp:
             pickle.dump(self, fp, pickle.HIGHEST_PROTOCOL)
 
 
@@ -70,7 +74,7 @@ class CoBRAS:
         Gradient Covariance.
     """
 
-    def __init__(self, X, Y):
+    def __init__(self, X: NDArray[np.float64], Y: NDArray[np.float64]):
         """Calculate U, s, VH, Phi, and Psi.
 
         Args:
@@ -81,22 +85,24 @@ class CoBRAS:
         Note:
             The X and Y used here are the transposes of X and Y in [1].
         """
-        self.U, self.s, self.VH = np.linalg.svd(np.dot(Y, X.T),
-                                                full_matrices=False,
-                                                compute_uv=True)
+        self.U, self.s, self.VH = np.linalg.svd(
+            np.dot(Y, X.T), full_matrices=False, compute_uv=True
+        )
         self.Phi = np.dot(X.T, self.VH.T) / np.sqrt(self.s)
         self.Psi = np.dot(Y.T, self.U) / np.sqrt(self.s)
 
-    def projectors(self):
+    def projectors(self) -> tuple[NDArray[np.float64], NDArray[np.float64]]:
         """Return Phi and Psi."""
         return self.Phi, self.Psi
 
-    def save_projectors(self, fname):
+    def save_projectors(self, fname: str) -> None:
         """Save the tuple (Phi, Psi)."""
-        with open(fname, 'wb') as fp:
+        with open(fname, "wb") as fp:
             pickle.dump((self.Phi, self.Psi), fp, pickle.HIGHEST_PROTOCOL)
 
-    def project(self, X, G, rank):
+    def project(
+        self, X: NDArray[np.float64], G: NDArray[np.float64], rank: int
+    ) -> ProjectedGradientDataset:
         """Project the gradient and state samples onto the direct modes, Phi,
         and adjoint modes, Psi.
 

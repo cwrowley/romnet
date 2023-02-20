@@ -1,10 +1,7 @@
 import numpy as np
-from romnet.model import Model
-from romnet.model import BilinearModel
-from romnet.model import NetworkROM
-from romnet.model import project
-from romnet.autoencoder import ProjAE
 import pytest
+from romnet.autoencoder import ProjAE
+from romnet.model import BilinearModel, Model, NetworkROM, project
 
 
 @pytest.fixture
@@ -94,8 +91,8 @@ def test_examples_agree(example1, example2):
     x = np.random.randn(3)
     v = np.random.randn(3)
     assert example1.rhs(x) == pytest.approx(example2.rhs(x))
-    assert (example1.adjoint_nonlinear(x, v) ==
-            pytest.approx(example2.adjoint_nonlinear(x, v)))
+    assert (example1.adjoint_nonlinear(x, v)
+            == pytest.approx(example2.adjoint_nonlinear(x, v)))
 
 
 def test_project_xy(example1):
@@ -121,8 +118,8 @@ def compare_projection(full_model):
     rom1 = full_model.project(V, W)
     rom2 = full_model.project(V, W1)
     z = np.random.randn(2)
-    V = np.array(V)
-    x = V.T @ z
+    V1 = np.array(V)
+    x = V1.T @ z
     proj_rhs = W1 @ full_model.rhs(x)
     assert rom1.rhs(z) == pytest.approx(proj_rhs)
     assert rom2.rhs(z) == pytest.approx(proj_rhs)

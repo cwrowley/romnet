@@ -8,30 +8,42 @@ class SlowSubspace(romnet.Model):
     """
     3-state ODE model with a slow subspace and transient growth
     """
+
     state_dim = 3
     output_dim = 3
 
-    def __init__(self, mu=0.1, omega=0.1, phi=np.pi/4, lam=20.):
+    def __init__(self, mu=0.1, omega=0.1, phi=np.pi / 4, lam=20.0):
         self.mu = mu
         self.omega = omega
-        self.phifac = 1. / np.tan(phi)
+        self.phifac = 1.0 / np.tan(phi)
         self.lam = lam
 
     def rhs(self, x):
-        xdot = (self.mu * x[0] - self.omega * x[1] - self.mu * x[0] *
-                (x[0]**2 + x[1]**2))
-        ydot = (self.omega * x[0] + self.mu * x[1] - self.mu * x[1] *
-                (x[0]**2 + x[1]**2) - self.lam * x[2] * self.phifac)
+        xdot = (
+            self.mu * x[0]
+            - self.omega * x[1]
+            - self.mu * x[0] * (x[0] ** 2 + x[1] ** 2)
+        )
+        ydot = (
+            self.omega * x[0]
+            + self.mu * x[1]
+            - self.mu * x[1] * (x[0] ** 2 + x[1] ** 2)
+            - self.lam * x[2] * self.phifac
+        )
         zdot = -self.lam * x[2]
         return np.array([xdot, ydot, zdot])
 
     def jac(self, x):
-        df1 = [self.mu * (1 - 2 * x[0]**2 - x[1]**2),
-               -self.omega - 2 * self.mu * x[0] * x[1],
-               0]
-        df2 = [self.omega - 2 * self.mu * x[0] * x[1],
-               self.mu * (1 - x[0]**2 - 3 * x[1]**2),
-               -self.lam * self.phifac]
+        df1 = [
+            self.mu * (1 - 2 * x[0] ** 2 - x[1] ** 2),
+            -self.omega - 2 * self.mu * x[0] * x[1],
+            0,
+        ]
+        df2 = [
+            self.omega - 2 * self.mu * x[0] * x[1],
+            self.mu * (1 - x[0] ** 2 - 3 * x[1] ** 2),
+            -self.lam * self.phifac,
+        ]
         df3 = [0, 0, -self.lam]
         return np.array([df1, df2, df3])
 
@@ -54,7 +66,7 @@ def random_ic():
 
 
 def generate_data():
-    model = SlowSubspace(mu=0.1, omega=0.1, lam=20.)
+    model = SlowSubspace(mu=0.1, omega=0.1, lam=20.0)
     dt = 0.1
     step = model.get_stepper(dt, method="rk2")
     adj_step = model.get_adjoint_stepper(dt, method="rk2")
@@ -71,10 +83,12 @@ def generate_data():
     s = 32  # samples per trajectory
     L = 15  # horizon for gradient sampling
     print("Sampling gradients...")
-    training_data = romnet.sample_gradient(training_traj, adj_step, identity,
-                                           model.output_dim, s, L)
-    test_data = romnet.sample_gradient(test_traj, adj_step, identity,
-                                       model.output_dim, s, L)
+    training_data = romnet.sample_gradient(
+        training_traj, adj_step, identity, model.output_dim, s, L
+    )
+    test_data = romnet.sample_gradient(
+        test_traj, adj_step, identity, model.output_dim, s, L
+    )
     print("Done")
 
     training_data.save("slow_train.dat")

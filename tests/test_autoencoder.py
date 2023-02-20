@@ -18,15 +18,15 @@ def test_pair21():
     z2 = z2.detach().numpy()
     assert z2 == pytest.approx(z)
 
-    batch = np.array([x, 2*x, 3*x])
+    batch = np.array([x, 2 * x, 3 * x])
     yy = pair.enc(batch)
     assert yy.size() == torch.Size([3, 1])
     zz = pair.dec(yy)
     assert zz.size() == torch.Size([3, 2])
     zz = zz.detach().numpy()
     assert zz[0] == pytest.approx(z)
-    assert zz[1] == pytest.approx(2*z)
-    assert zz[2] == pytest.approx(3*z)
+    assert zz[1] == pytest.approx(2 * z)
+    assert zz[2] == pytest.approx(3 * z)
 
 
 def test_pair22():
@@ -36,7 +36,7 @@ def test_pair22():
     z = pair.dec(y).detach().numpy()
     assert z == pytest.approx(x)
 
-    batch = np.array([x, 2*x, 3*x])
+    batch = np.array([x, 2 * x, 3 * x])
     ybatch = pair.enc(batch)
     zbatch = pair.dec(ybatch).detach().numpy()
     print(batch)
@@ -49,8 +49,8 @@ def test_pair_tangent():
     sizes = [1, 2]
     x = np.ones(2)
     v0 = np.zeros(2)
-    v1 = np.array([1., 0])
-    v2 = np.array([0., 1])
+    v1 = np.array([1.0, 0])
+    v2 = np.array([0.0, 1])
     for i, pair in enumerate(pairs):
         w0 = pair.d_enc(x, v0)
         w1 = pair.d_enc(x, v1)
@@ -59,8 +59,7 @@ def test_pair_tangent():
         assert w0.size() == torch.Size([sizes[i]])
         assert w1.size() == torch.Size([sizes[i]])
         assert w0.detach() == pytest.approx(0)
-        assert (w1.detach() + w2.detach() ==
-                pytest.approx(w12.detach()))
+        assert w1.detach() + w2.detach() == pytest.approx(w12.detach())
 
         y = pair.enc(x)
         z0 = pair.d_dec(y, w0)
@@ -69,11 +68,10 @@ def test_pair_tangent():
         z12 = pair.d_dec(y, w1 + w2)
         assert z0.size() == torch.Size([2])
         assert z1.size() == torch.Size([2])
-        assert (z1.detach() + z2.detach() ==
-                pytest.approx(z12.detach()))
+        assert z1.detach() + z2.detach() == pytest.approx(z12.detach())
 
         xbatch = np.array([x, x, x, x])
-        vbatch = np.array([v0, v1, v2, v1+v2])
+        vbatch = np.array([v0, v1, v2, v1 + v2])
         wbatch = pair.d_enc(xbatch, vbatch)
         assert wbatch.size() == torch.Size([4, sizes[i]])
         for w, ww in zip(wbatch.detach(), [w0, w1, w2, w12]):
@@ -100,7 +98,7 @@ def test_ae():
     z = z.detach().numpy()
     assert z2 == pytest.approx(z)
 
-    batch = np.array([x, 2*x, 3*x])
+    batch = np.array([x, 2 * x, 3 * x])
     yy = ae.enc(batch)
     assert yy.size() == torch.Size([3, 2])
     zz = ae.dec(yy)
