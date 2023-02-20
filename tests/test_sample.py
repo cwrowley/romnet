@@ -18,7 +18,7 @@ class MyModel(Model):
     def rhs(self, x):
         if self.debug:
             print(f"  rhs({x})")
-        return -x**3
+        return -(x**3)
 
     def adjoint_rhs(self, x, v):
         if self.debug:
@@ -34,13 +34,14 @@ def try_steppers():
     dim = 2
     model = MyModel(dim=dim, debug=False)
     dt = 0.1
-    model.set_stepper(dt, method="rk2", nsteps=1)
+    step = model.get_stepper(dt, method="rk2")
+    adjoint_step = model.get_adjoint_stepper(dt, method="rk2")
     x = np.ones(dim)
     v = np.ones(dim)
-    for i in range(5):
-        x = model.step(x)
+    for _ in range(5):
+        x = step(x)
         print(x)
-        v = model.adjoint_step(x, v)
+        v = adjoint_step(x, v)
 
 
 def test_trajlist():
@@ -54,11 +55,14 @@ def test_sample():
     dim = 2
     model = MyModel(dim=dim, debug=False)
     dt = 0.1
-    step = model.get_stepper(dt, method='rk2')
-    adj_step = model.get_adjoint_stepper(dt, method='rk2')
+    step = model.get_stepper(dt, method="rk2")
+    adj_step = model.get_adjoint_stepper(dt, method="rk2")
     num_traj = 5
     n = 10
-    def random_ic(): return np.random.randn(dim)
+
+    def random_ic():
+        return np.random.randn(dim)
+
     data = sample(step, random_ic, num_traj, n)
     assert len(data) == num_traj * n
     # for i,x in enumerate(data.traj):
@@ -70,14 +74,16 @@ def test_sample():
     batch_size = 7
     grad_data = sample_gradient(data, adj_step, identity, model.num_outputs, s, L)
     assert len(grad_data) == num_traj * s
-    dataloader = torch.utils.data.DataLoader(grad_data, batch_size=batch_size,
-                                             shuffle=True)
+    dataloader = torch.utils.data.DataLoader(
+        grad_data, batch_size=batch_size, shuffle=True
+    )
     X, G = next(iter(dataloader))
     assert X.shape == torch.Size([batch_size, dim])
     assert G.shape == torch.Size([batch_size, dim])
 
-    grad_data, D = sample_gradient_long_traj(data, adj_step, identity,
-                                             model.num_outputs, s, L)
+    grad_data, D = sample_gradient_long_traj(
+        data, adj_step, identity, model.num_outputs, s, L
+    )
     assert grad_data.G.shape == grad_data.X.shape
     assert len(D) == grad_data.G.shape[0]
 

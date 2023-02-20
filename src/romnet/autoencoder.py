@@ -1,22 +1,28 @@
-import torch
-from torch import nn
+from typing import Optional, Union
+
 import numpy as np
+import torch
 from scipy.stats import ortho_group
+from torch import Tensor, nn
+
+from .typing import Vector
 
 __all__ = ["ProjAE", "GAP_loss", "reduced_GAP_loss", "load_romnet", "save_romnet"]
 
 # for better compatibility with numpy arrays
 torch.set_default_dtype(torch.float64)
 
+TVector = Union[Vector, Tensor]
+
 
 class LayerPair(nn.Module):
-    def __init__(self, dim_in, dim_out, angle=None):
+    def __init__(self, dim_in: int, dim_out: int, angle: Optional[float] = None):
         super().__init__()
         if angle is None:
             angle = np.pi / 8
         # activation function parameters
-        self.a = 1. / np.sin(angle)**2 - 1. / np.cos(angle)**2
-        self.b = 1. / np.sin(angle)**2 + 1. / np.cos(angle)**2
+        self.a = 1.0 / np.sin(angle) ** 2 - 1.0 / np.cos(angle) ** 2
+        self.b = 1.0 / np.sin(angle) ** 2 + 1.0 / np.cos(angle) ** 2
         self.d = self.b**2 - self.a**2
 
         self.dim_in = dim_in
@@ -29,68 +35,70 @@ class LayerPair(nn.Module):
         self.update()
 
         # initialize biases
-        self.bias = nn.Parameter(-np.sqrt(2*self.a) / self.a *
-                                 (self.D @ torch.ones(self.dim_out, 1)))
+        self.bias = nn.Parameter(
+            -np.sqrt(2 * self.a) / self.a * (self.D @ torch.ones(self.dim_out, 1))
+        )
 
-    def extra_repr(self):
+    def extra_repr(self) -> str:
         return "%d, %d" % (self.dim_in, self.dim_out)
 
-    def update(self):
+    def update(self) -> None:
         self.E = (self.X @ self.D).inverse() @ self.X
 
-    def enc_activ(self, x):
+    def enc_activ(self, x: Tensor) -> Tensor:
         """Activation function for encoder"""
         return (self.b * x - torch.sqrt(self.d * x**2 + 2 * self.a)) / self.a
 
-    def dec_activ(self, x):
+    def dec_activ(self, x: Tensor) -> Tensor:
         """Activation function for decoder"""
         return (self.b * x + torch.sqrt(self.d * x**2 + 2 * self.a)) / self.a
 
-    def d_enc_activ(self, x):
-        return (self.b / self.a - self.d * x /
-                (self.a * torch.sqrt(self.d * x**2 + 2*self.a)))
+    def d_enc_activ(self, x: Tensor) -> Tensor:
+        return self.b / self.a - self.d * x / (
+            self.a * torch.sqrt(self.d * x**2 + 2 * self.a)
+        )
 
-    def d_dec_activ(self, x):
-        return (self.b / self.a + self.d * x /
-                (self.a * torch.sqrt(self.d * x**2 + 2*self.a)))
+    def d_dec_activ(self, x: Tensor) -> Tensor:
+        return self.b / self.a + self.d * x / (
+            self.a * torch.sqrt(self.d * x**2 + 2 * self.a)
+        )
 
-    def enc(self, x):
+    def enc(self, x: TVector) -> Tensor:
         """Encoder"""
         x = torch.as_tensor(x).unsqueeze(-1)
         return self.enc_activ(self.E @ (x - self.bias)).squeeze(-1)
 
-    def enc_slow(self, x):
+    def enc_slow(self, x: TVector) -> Tensor:
         x = torch.as_tensor(x).unsqueeze(-1)
         return self.enc_activ(
-                torch.linalg.solve(torch.matmul(self.X, self.D),
-                                   torch.matmul(self.X,
-                                                x - self.bias))).squeeze(-1)
+            torch.linalg.solve(
+                torch.matmul(self.X, self.D), torch.matmul(self.X, x - self.bias)
+            )
+        ).squeeze(-1)
 
-    def dec(self, x):
+    def dec(self, x: TVector) -> Tensor:
         """Decoder"""
         x = torch.as_tensor(x).unsqueeze(-1)
-        return (torch.matmul(self.D, self.dec_activ(x))
-                + self.bias).squeeze(-1)
+        return (torch.matmul(self.D, self.dec_activ(x)) + self.bias).squeeze(-1)
 
-    def forward(self, x):
+    def forward(self, x: TVector) -> Tensor:
         return self.dec(self.enc(x))
 
-    def d_enc(self, x, v):
+    def d_enc(self, x: TVector, v: TVector) -> Tensor:
         """Tangent map of encoder"""
         x = torch.as_tensor(x).unsqueeze(-1)
         v = torch.as_tensor(v).unsqueeze(-1)
-        return (self.d_enc_activ(self.E  @ (x - self.bias)) *
-                self.E @ v).squeeze(-1)
+        return (self.d_enc_activ(self.E @ (x - self.bias)) * self.E @ v).squeeze(-1)
 
-    def d_dec(self, x, v):
+    def d_dec(self, x: TVector, v: TVector) -> Tensor:
         """Tangent map of decoder"""
         x = torch.as_tensor(x).unsqueeze(-1)
         v = torch.as_tensor(v).unsqueeze(-1)
         return torch.matmul(self.D, self.d_dec_activ(x) * v).squeeze(-1)
 
-    def regularizer(self):
+    def regularizer(self) -> Tensor:
         P = self.D @ self.E
-        return torch.log(torch.frobenius_norm(P)**2 / self.dim_out)
+        return torch.log(torch.frobenius_norm(P) ** 2 / self.dim_out)
 
 
 class ProjAE(nn.Module):
@@ -99,73 +107,77 @@ class ProjAE(nn.Module):
 
     The autoencoder is built from a sequence of LayerPair objects
     """
-    def __init__(self, dims):
+
+    def __init__(self, dims: list[int]):
         super().__init__()
         self.dims = dims
         self.num_layers = len(dims) - 1
-        self.layers = nn.ModuleList([
-            LayerPair(self.dims[i], self.dims[i+1])
-            for i in range(self.num_layers)
-            ])
+        self.layers = nn.ModuleList(
+            [LayerPair(self.dims[i], self.dims[i + 1]) for i in range(self.num_layers)]
+        )
 
-    def update(self):
+    def update(self) -> None:
         for pair in self.layers:
             pair.update()
 
-    def enc(self, x):
+    def enc(self, x: TVector) -> Tensor:
+        xout = torch.as_tensor(x)
         for layer in self.layers:
-            x = layer.enc(x)
-        return x
+            xout = layer.enc(xout)
+        return xout
 
-    def dec(self, x):
+    def dec(self, x: TVector) -> Tensor:
+        xout = torch.as_tensor(x)
         for layer in reversed(self.layers):
-            x = layer.dec(x)
-        return x
+            xout = layer.dec(xout)
+        return xout
 
-    def d_enc(self, x, v):
+    def d_enc(self, x: TVector, v: TVector) -> tuple[Tensor, Tensor]:
+        xout = torch.as_tensor(x)
+        vout = torch.as_tensor(v)
         for layer in self.layers:
-            v = layer.d_enc(x, v)
-            x = layer.enc(x)
-        return x, v
+            vout = layer.d_enc(xout, vout)
+            xout = layer.enc(xout)
+        return xout, vout
 
-    def d_dec(self, x, v):
+    def d_dec(self, x: TVector, v: TVector) -> tuple[Tensor, Tensor]:
+        xout = torch.as_tensor(x)
+        vout = torch.as_tensor(v)
         for layer in reversed(self.layers):
-            v = layer.d_dec(x, v)
-            x = layer.dec(x)
-        return x, v
+            vout = layer.d_dec(xout, vout)
+            xout = layer.dec(xout)
+        return xout, vout
 
-    def d_autoenc(self, x, v):
+    def d_autoenc(self, x: TVector, v: TVector) -> tuple[Tensor, Tensor]:
         z, vz = self.d_enc(x, v)
         return self.d_dec(z, vz)
 
-    def forward(self, x):
+    def forward(self, x: TVector) -> Tensor:
         return self.dec(self.enc(x))
 
-    def regularizer(self):
-        total_regularizer = 0
+    def regularizer(self) -> float:
+        total_regularizer = 0.0
         for layer in self.layers:
             total_regularizer += layer.regularizer()
         return total_regularizer
 
-    def save(self, fname):
+    def save(self, fname: str) -> None:
         torch.save(self, fname)
 
 
-def load_romnet(fname):
+def load_romnet(fname: str) -> ProjAE:
     net = torch.load(fname)
     net.update()
     return net
 
 
-def save_romnet(autoencoder, fname):
+def save_romnet(autoencoder: ProjAE, fname: str) -> None:
     torch.save(autoencoder, fname)
 
 
-def GAP_loss(X_pred, X, G):
-    return torch.mean(torch.square(torch.sum(G *
-                                             (X_pred - X), dim=1)))
+def GAP_loss(X_pred: Tensor, X: Tensor, G: Tensor) -> Tensor:
+    return torch.mean(torch.square(torch.sum(G * (X_pred - X), dim=1)))
 
 
-def reduced_GAP_loss(X_pred, X, G, XdotG):
-    return torch.mean(torch.square(XdotG
-                                   - torch.sum(G * X_pred, dim=1)))
+def reduced_GAP_loss(X_pred: Tensor, X: Tensor, G: Tensor, XdotG: Tensor) -> Tensor:
+    return torch.mean(torch.square(XdotG - torch.sum(G * X_pred, dim=1)))

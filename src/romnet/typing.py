@@ -1,12 +1,13 @@
-from typing import Callable, Protocol
-from numpy.typing import ArrayLike
+from typing import Any, Callable, Union
 
-# class Vector(ArrayLike, Protocol):
-#     def __mul__(self, alpha: float) -> "Vector":
-#         ...
+import numpy as np
+import numpy.typing as npt
 
-#     def dot(self, x: "Vector") -> "Vector":
-#         ...
-
-Vector = ArrayLike
+# Vector = Union[npt.NDArray[np.float64], npt.NDArray[np.complex64]]
+# T = TypeVar("T", np.float64, np.complex64)
+# Vector = npt.NDArray[T]
+# Vector = npt.NDArray[np.float64]
+# Vector = npt.NDArray[Any]
+Vector = np.ndarray[Any, Any]
 VectorField = Callable[[Vector], Vector]
+VectorList = Union[list[Vector], npt.NDArray[np.float64]]

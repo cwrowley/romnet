@@ -1,9 +1,10 @@
 #!/usr/bin/env python
 
+import sys
+
+import romnet
 import torch
 from torch.utils.data import DataLoader
-import sys
-import romnet
 
 
 def train_autoencoder(basename, train_num=""):
@@ -14,7 +15,7 @@ def train_autoencoder(basename, train_num=""):
 
     # autoencoder hyperparameters by example
     #   noack
-    learning_rate = 1.e-4
+    learning_rate = 1.0e-4
     batch_size = 400
     num_epochs = 750
     dims = [3, 3, 3, 3, 3, 3, 2]
@@ -31,8 +32,7 @@ def train_autoencoder(basename, train_num=""):
     """
 
     # save initial weights
-    romnet.save_romnet(autoencoder, basename + train_num + "_initial" +
-                       ".romnet")
+    romnet.save_romnet(autoencoder, basename + train_num + "_initial" + ".romnet")
 
     # load autoencoder
     # autoencoder = romnet.load_romnet(basename + train_num + ".romnet")
@@ -42,6 +42,7 @@ def train_autoencoder(basename, train_num=""):
         loss = romnet.GAP_loss(X_pred, X, G)
         # reg = gamma * autoencoder.regularizer()
         return loss  # + reg
+
     """
     def loss_fn(Xi_pred, X, G, XdotG):
         loss = romnet.reduced_GAP_loss(Xi_pred, X, G, XdotG)
@@ -51,10 +52,8 @@ def train_autoencoder(basename, train_num=""):
 
     # train autoencoder
     optimizer = torch.optim.Adam(autoencoder.parameters(), lr=learning_rate)
-    train_dataloader = DataLoader(training_data,
-                                  batch_size=batch_size, shuffle=True)
-    test_dataloader = DataLoader(test_data,
-                                 batch_size=batch_size, shuffle=True)
+    train_dataloader = DataLoader(training_data, batch_size=batch_size, shuffle=True)
+    test_dataloader = DataLoader(test_data, batch_size=batch_size, shuffle=True)
 
     for t in range(num_epochs):
         print(f"Epoch {t+1}\n-----------------")

@@ -1,10 +1,16 @@
-import numpy as np
 import pickle
+from typing import Any, Callable
+
+import numpy as np
+from numpy.typing import ArrayLike, NDArray
+from torch.utils.data import Dataset
+
+from .typing import Vector, VectorField
 
 __all__ = ["sample", "sample_gradient", "load", "sample_gradient_long_traj"]
 
 
-class TrajectoryList:
+class TrajectoryList(Dataset[Vector]):
     """
     Container for samples of trajectories
 
@@ -20,7 +26,7 @@ class TrajectoryList:
     training = DataLoader(dataset, batch_size=64, shuffle=True)
     """
 
-    def __init__(self, traj):
+    def __init__(self, traj: ArrayLike):
         self.traj = np.array(traj)
         self.num_traj = self.traj.shape[0]
         self.n = self.traj.shape[1]
@@ -28,42 +34,44 @@ class TrajectoryList:
         newshape[1] *= newshape[0]
         newshape.pop(0)
         self.data = self.traj.view()
-        self.data.shape = newshape
+        self.data.shape = tuple(newshape)
 
-    def __len__(self):
+    def __len__(self) -> int:
         return len(self.data)
 
-    def __getitem__(self, i):
+    def __getitem__(self, i: int) -> Vector:
         return self.data[i]
 
-    def save(self, fname):
-        with open(fname, 'wb') as fp:
+    def save(self, fname: str) -> None:
+        with open(fname, "wb") as fp:
             pickle.dump(self, fp, pickle.HIGHEST_PROTOCOL)
 
 
-class GradientDataset:
-    def __init__(self, X, G):
+class GradientDataset(Dataset[tuple[Vector, Vector]]):
+    def __init__(self, X: ArrayLike, G: ArrayLike):
         self.X = np.array(X)
         self.G = np.array(G)
 
-    def __len__(self):
+    def __len__(self) -> int:
         return self.X.shape[0]
 
-    def __getitem__(self, i):
+    def __getitem__(self, i: int) -> tuple[Vector, Vector]:
         return self.X[i], self.G[i]
 
-    def save(self, fname):
-        with open(fname, 'wb') as fp:
+    def save(self, fname: str) -> None:
+        with open(fname, "wb") as fp:
             pickle.dump(self, fp, pickle.HIGHEST_PROTOCOL)
 
 
-def load(fname):
-    with open(fname, 'rb') as fp:
+def load(fname: str) -> Any:
+    with open(fname, "rb") as fp:
         data = pickle.load(fp)
     return data
 
 
-def sample(step, random_state, num_traj, n):
+def sample(
+    step: VectorField, random_state: Callable[[], Vector], num_traj: int, n: int
+) -> TrajectoryList:
     """
     Sample num_traj trajectories each with length n
 
@@ -73,11 +81,11 @@ def sample(step, random_state, num_traj, n):
     Returns a TrajectoryList object
     """
     traj_list = list()
-    for i in range(num_traj):
+    for _ in range(num_traj):
         traj = list()
         x = random_state()
         traj.append(x)
-        for t in range(n-1):
+        for _ in range(n - 1):
             x = step(x)
             x = np.array(x)  # NetworkROM in torch
             traj.append(x)
@@ -85,8 +93,14 @@ def sample(step, random_state, num_traj, n):
     return TrajectoryList(traj_list)
 
 
-def sample_gradient(traj_list, adj_step, adj_output, num_outputs,
-                    samples_per_traj, L):
+def sample_gradient(
+    traj_list: TrajectoryList,
+    adj_step: Callable[[Vector, Vector], Vector],
+    adj_output: Callable[[Vector, Vector], Vector],
+    num_outputs: int,
+    samples_per_traj: int,
+    L: int,
+) -> GradientDataset:
     """Sample the gradient using the standard method discussed in Section 3 of
     [1].
 
@@ -127,8 +141,14 @@ def sample_gradient(traj_list, adj_step, adj_output, num_outputs,
     return GradientDataset(X, G)
 
 
-def sample_gradient_long_traj(traj_list, adj_step, adj_output, num_outputs,
-                              samples_per_traj, L):
+def sample_gradient_long_traj(
+    traj_list: TrajectoryList,
+    adj_step: Callable[[Vector, Vector], Vector],
+    adj_output: Callable[[Vector, Vector], Vector],
+    num_outputs: int,
+    samples_per_traj: int,
+    L: int,
+) -> tuple[GradientDataset, NDArray[np.float64]]:
     """Sample the gradient using the method of long trajectories discussed in
     Algorithm 3.1 of [1].
 
@@ -164,8 +184,8 @@ def sample_gradient_long_traj(traj_list, adj_step, adj_output, num_outputs,
     G = list()
     D = list()
     N = traj_list.n  # num pts in each trajectory
-    for k, x in enumerate(traj_list.traj):
-        for j in range(samples_per_traj):
+    for x in traj_list.traj:
+        for _ in range(samples_per_traj):
             t = np.random.randint(N - L)
             tau = np.random.randint(L + 1)
             eta = np.sqrt(L + 1) * np.random.randn(num_outputs)
