@@ -39,6 +39,10 @@ class SlowSubspace(romnet.Model):
         return self.jac(x).T @ v
 
 
+def identity(_, v):
+    return v
+
+
 def random_ic():
     xmax = 4
     zmin = -4
@@ -52,22 +56,25 @@ def random_ic():
 def generate_data():
     model = SlowSubspace(mu=0.1, omega=0.1, lam=20.)
     dt = 0.1
-    model.set_stepper(dt, method="rk2", nsteps=5)
+    step = model.get_stepper(dt, method="rk2")
+    adj_step = model.get_adjoint_stepper(dt, method="rk2")
 
     # generate trajectories for training/testing
     num_train = 1024
     num_test = 64
     n = 30  # length of each trajectory
     print("Generating training trajectories...")
-    training_traj = romnet.sample(model.step, random_ic, num_train, n)
-    test_traj = romnet.sample(model.step, random_ic, num_test, n)
+    training_traj = romnet.sample(step, random_ic, num_train, n)
+    test_traj = romnet.sample(step, random_ic, num_test, n)
 
     # sample gradients for GAP loss
     s = 32  # samples per trajectory
     L = 15  # horizon for gradient sampling
     print("Sampling gradients...")
-    training_data = romnet.sample_gradient(training_traj, model, s, L)
-    test_data = romnet.sample_gradient(test_traj, model, s, L)
+    training_data = romnet.sample_gradient(training_traj, adj_step, identity,
+                                           model.output_dim, s, L)
+    test_data = romnet.sample_gradient(test_traj, adj_step, identity,
+                                       model.output_dim, s, L)
     print("Done")
 
     training_data.save("slow_train.dat")

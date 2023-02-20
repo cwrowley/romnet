@@ -3,7 +3,7 @@
 import numpy as np
 from scipy.special import eval_hermite, gammaln, roots_hermite
 
-from .. import SemiLinearModel
+from .. import SemiLinearModel, LUSolver
 
 __all__ = ["CGL"]
 
@@ -97,7 +97,7 @@ class CGL(SemiLinearModel):
 
     @property
     def num_outputs(self):
-        return 2 * self.nx
+        return self.C.shape[0]
 
     @property
     def gamma(self):
@@ -139,6 +139,20 @@ class CGL(SemiLinearModel):
         A = np.vstack([np.hstack([Arr, Ari]), np.hstack([Air, Aii])])
         return A, w_quad, xi, x
 
+    def linear(self, x):
+        return self._linear @ x
+
+    def adjoint(self, x):
+        return self._linear.T @ x
+
+    def get_solver(self, alpha):
+        mat = np.eye(self.num_states) - alpha * self._linear
+        return LUSolver(mat)
+
+    def get_adjoint_solver(self, alpha):
+        mat = np.eye(self.num_states) - alpha * self._linear.T
+        return LUSolver(mat)
+
     def _construct_output(self):
         # observation kernel defined by eqn. 4.1 in M. Ilak et al.
         # branch_2 is downstream bound of unstable region
@@ -155,6 +169,9 @@ class CGL(SemiLinearModel):
 
     def output(self, q):
         return np.dot(self.C, q)
+
+    def adjoint_output(self, _, v):
+        return np.dot(self.C.T, v)
 
     def nonlinear(self, q):
         # real and imaginary parts in original state space

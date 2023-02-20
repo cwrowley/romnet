@@ -12,7 +12,6 @@ class NoackModel(Model):
     3-state ODE model, normal form of Hopf bifurcation, used in Noack (2000)
     """
     num_states = 3
-    num_outputs = 3
 
     def __init__(self, mu=0.1, omega=1., A=-0.1, lam=10.):
         self.mu = mu

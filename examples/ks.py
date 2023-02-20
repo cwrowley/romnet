@@ -54,7 +54,8 @@ def main():
     L = 400
     ks = KuramotoSivashinsky(nmodes, L)
     dt = 0.1
-    ks.set_stepper(dt, "rk3cn")
+    # ks.set_stepper(dt, "rk3cn")
+    step = ks.get_stepper(dt, "rk3cn")
 
     # initial condition
     u = np.zeros(nmodes + 1, dtype=complex)
@@ -66,7 +67,7 @@ def main():
     sol = np.zeros((nt, nx))
     print("Computing solution...")
     for t in range(nt):
-        u = ks.step(u)
+        u = step(u)
         sol[t] = freq_to_space(u)
         if t % 1000 == 0:
             print("  step %4d / %4d" % (t, nt))
