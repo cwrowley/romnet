@@ -25,11 +25,10 @@ def compare_timesteppers():
 
     model = CGL(nx)
     method1 = "rk3cn"
-    model.set_stepper(dt1, method=method1)
+    step1 = model.get_stepper(dt1, method=method1)
 
-    model2 = CGL(nx)
     method2 = "rk2cn"
-    model2.set_stepper(dt2, method=method2)
+    step2 = model.get_stepper(dt2, method=method2)
 
     q0 = model.random_ic()
 
@@ -37,7 +36,7 @@ def compare_timesteppers():
     q1[0] = q0
     tic = time.time()
     for i in range(num_steps1 - 1):
-        q1[i + 1] = model.step(q1[i])
+        q1[i + 1] = step1(q1[i])
     toc = time.time()
     print(f"Elapsed time for {method1} = {toc - tic}")
 
@@ -45,12 +44,12 @@ def compare_timesteppers():
     q2[0] = q0
     tic = time.time()
     for i in range(num_steps2 - 1):
-        q2[i + 1] = model2.step(q2[i])
+        q2[i + 1] = step2(q2[i])
     toc = time.time()
     print(f"Elapsed time for {method2} = {toc - tic}")
 
     tic = time.time()
-    sol = solve_ivp(lambda t, q: model.rhs(q),
+    sol = solve_ivp(lambda _, q: model.rhs(q),
                     # jac=lambda t, q: model.jac(q),
                     t_span=[0, t_final],
                     y0=q0,
@@ -60,7 +59,7 @@ def compare_timesteppers():
     print(f"Elapsed time for solve_ivp = {toc - tic}")
 
     y1 = model.output(q1.T).T
-    y2 = model2.output(q2.T).T
+    y2 = model.output(q2.T).T
     y3 = model.output(sol.y).T
     plt.figure()
     plt.plot(t1, y1[:, 0], label=method1)
@@ -74,7 +73,7 @@ def compare_timesteppers():
 def generate_data():
     model = CGL()
     dt = 0.5
-    model.set_stepper(dt, method="rk3cn")
+    step = model.get_stepper(dt, method="rk3cn")
 
     num_train = 1
     num_test = 1
@@ -84,19 +83,20 @@ def generate_data():
 
     # generating trajectories
     print("Generating training trajectories...")
-    training_traj = romnet.sample(model.step, model.random_ic, num_train, n)
-    test_traj = romnet.sample(model.step, model.random_ic, num_test, n)
+    training_traj = romnet.sample(step, model.random_ic, num_train, n)
+    test_traj = romnet.sample(step, model.random_ic, num_test, n)
     training_traj.save("cgl_train.traj")
     test_traj.save("cgl_test.traj")
 
     # sampling gradients
     s = 32  # samples per trajectory
     L = 15  # horizon for gradient sampling
+    adj_step = model.get_adjoint_stepper(dt, method="rk3cn")
     print("Sampling gradients...")
-    training_data, _ = romnet.sample_gradient_long_traj(training_traj, model,
-                                                        s, L)
-    test_data, _ = romnet.sample_gradient_long_traj(test_traj, model,
-                                                    s, L)
+    training_data, _ = romnet.sample_gradient_long_traj(training_traj, adj_step,
+                                                        model.adjoint_output, model.num_outputs, s, L)
+    test_data, _ = romnet.sample_gradient_long_traj(test_traj, adj_step,
+                                                    model.adjoint_output, model.num_outputs, s, L)
     print("Done")
 
     # ProjectedGradientDataset
@@ -111,5 +111,5 @@ def generate_data():
 
 
 if __name__ == "__main__":
-    # compare_timesteppers()
-    generate_data()
+    compare_timesteppers()
+    # generate_data()

@@ -1,6 +1,8 @@
 """timestepper - step ordinary differential equations forward in time"""
 
 import abc
+from typing import Callable
+from .typing import Vector, VectorField
 
 __all__ = ["Timestepper", "SemiImplicit"]
 
@@ -17,18 +19,18 @@ class Timestepper(abc.ABC):
         cls.__registry[name] = cls
 
     @classmethod
-    def lookup(cls, method):
+    def lookup(cls, method: str):
         """Return the subclass corresponding to the string in `method`."""
         try:
             return cls.__registry[method.lower()]
         except KeyError as exc:
             raise NotImplementedError(f"Method '{method}' unknown") from exc
 
-    def __init__(self, dt):
+    def __init__(self, dt: float):
         self.dt = dt
 
     @abc.abstractmethod
-    def step(self, x, rhs):
+    def step(self, x: Vector, rhs: VectorField):
         """Advance the state x by one timestep, for the ODE x' = rhs(x)."""
 
     @classmethod
@@ -48,14 +50,15 @@ class SemiImplicit(abc.ABC):
         cls.__registry[name] = cls
 
     @classmethod
-    def lookup(cls, method):
+    def lookup(cls, method: str):
         """Return the subclass corresponding to the string in `method`."""
         try:
             return cls.__registry[method.lower()]
         except KeyError as exc:
             raise NotImplementedError(f"Method '{method}' unknown") from exc
 
-    def __init__(self, dt, linear, solver_factory):
+    def __init__(self, dt: float, linear: VectorField,
+                 solver_factory: Callable[[float], Callable[[Vector], Vector]]):
         self._dt = dt
         self.linear = linear
         self.get_solver = solver_factory
@@ -79,7 +82,7 @@ class SemiImplicit(abc.ABC):
         """
 
     @abc.abstractmethod
-    def step(self, x, nonlinear):
+    def step(self, x: Vector, nonlinear: VectorField):
         """Advance the state forward by one step"""
 
     @classmethod
@@ -90,14 +93,14 @@ class SemiImplicit(abc.ABC):
 class Euler(Timestepper):
     """Explicit Euler timestepper."""
 
-    def step(self, x, rhs):
+    def step(self, x: Vector, rhs: VectorField):
         return x + self.dt * rhs(x)
 
 
 class RK2(Timestepper):
     """Second-order Runge-Kutta timestepper."""
 
-    def step(self, x, rhs):
+    def step(self, x: Vector, rhs: VectorField):
         k1 = self.dt * rhs(x)
         k2 = self.dt * rhs(x + k1)
         return x + (k1 + k2) / 2.
@@ -106,7 +109,7 @@ class RK2(Timestepper):
 class RK4(Timestepper):
     """Fourth-order Runge-Kutta timestepper."""
 
-    def step(self, x, rhs):
+    def step(self, x: Vector, rhs: VectorField):
         k1 = self.dt * rhs(x)
         k2 = self.dt * rhs(x + k1 / 2.)
         k3 = self.dt * rhs(x + k2 / 2.)
@@ -123,7 +126,7 @@ class RK2CN(SemiImplicit):
     def update(self):
         self.solve = self.get_solver(0.5 * self.dt)
 
-    def step(self, x, nonlinear):
+    def step(self, x: Vector, nonlinear: VectorField):
         rhs_linear = x + 0.5 * self.dt * self.linear(x)
         Nx = nonlinear(x)
 
@@ -148,7 +151,7 @@ class RK3CN(SemiImplicit):
     def update(self):
         self.solvers = [self.get_solver(b * self.dt) for b in self.Bprime]
 
-    def step(self, x, nonlinear):
+    def step(self, x: Vector, nonlinear: VectorField):
         A = self.A
         B = self.B
         Bprime = self.Bprime

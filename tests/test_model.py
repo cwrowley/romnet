@@ -2,6 +2,7 @@ import numpy as np
 from romnet.model import Model
 from romnet.model import BilinearModel
 from romnet.model import NetworkROM
+from romnet.model import project
 from romnet.autoencoder import ProjAE
 import pytest
 
@@ -137,9 +138,9 @@ def test_projection2(example2):
 
 def test_stepper(example1):
     dt = 0.1
-    example1.set_stepper(dt, method="rk2cn")
+    step = example1.get_stepper(dt, method="rk2cn")
     x = np.array([1, 1, 1])
-    example1.step(x)
+    step(x)
 
 
 class Pitchfork(Model):
@@ -210,11 +211,11 @@ def test_network_rom(pitchfork, autoencoder, network_rom):
 def test_project_rom(pitchfork):
     Phi_T = np.array([[1, 0]])
     Psi_T = np.array([[1, 0]])
-    rom = pitchfork.project(Phi_T, Psi_T)
+    rom_rhs = project(pitchfork.rhs, Phi_T, Psi_T)
     x = np.random.randn(2)
     z = Psi_T @ x
     directoutput = Psi_T @ pitchfork.rhs(Phi_T.T @ z)
-    romoutput = rom.rhs(z)
+    romoutput = rom_rhs(z)
     assert directoutput == pytest.approx(romoutput)
     directoutput = Phi_T.T @ directoutput
     romoutput = Phi_T.T @ romoutput

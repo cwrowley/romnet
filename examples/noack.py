@@ -1,11 +1,12 @@
 #!/usr/bin/env python
 
-import numpy as np
 import sys
-import romnet
-from romnet.models import NoackModel
-import torch
+
 import matplotlib.pyplot as plt
+import numpy as np
+import romnet
+import torch
+from romnet.models import NoackModel
 
 
 def random_ic():
@@ -18,18 +19,24 @@ def random_ic():
     return np.array((x, y, z))
 
 
+def identity(x):
+    return x
+
+def adj_output(x, eta):
+    return eta
+
 def generate_data():
     model = NoackModel(mu=0.1, omega=1., A=-0.1, lam=10)
     dt = 0.1
-    model.set_stepper(dt, method="rk2", nsteps=5)
+    step = model.get_stepper(dt, method="rk2")
 
     # generate trajectories for training/testing
-    num_train = 1000
-    num_test = 64  # Old code used 1000                                        -
+    num_train = 1024
+    num_test = 64
     n = 200  # length of each trajectory
     print("Generating training and testing trajectories...")
-    training_traj = romnet.sample(model.step, random_ic, num_train, n)
-    test_traj = romnet.sample(model.step, random_ic, num_test, n)
+    training_traj = romnet.sample(step, random_ic, num_train, n)
+    test_traj = romnet.sample(step, random_ic, num_test, n)
     training_traj.save("noack_train.traj")
     test_traj.save("noack_test.traj")
 
@@ -37,8 +44,13 @@ def generate_data():
     s = 10  # samples per trajectory
     L = 20  # horizon for gradient sampling
     print("Sampling gradients...")
-    training_data, _ = romnet.sample_gradient_long_traj(training_traj, model, s, L)
-    test_data, _ = romnet.sample_gradient_long_traj(test_traj, model, s, L)
+    adj_step = model.get_adjoint_stepper(dt, method="rk2")
+    training_data, _ = romnet.sample_gradient_long_traj(
+        training_traj, adj_step, adj_output, model.num_states, s, L
+    )
+    test_data, _ = romnet.sample_gradient_long_traj(
+        test_traj, adj_step, adj_output, model.num_states, s, L
+    )
     print("Done")
 
     training_data.save("noack_train.dat")

@@ -26,6 +26,10 @@ class MyModel(Model):
         return -3 * x**2 * v
 
 
+def identity(_, v):
+    return v
+
+
 def try_steppers():
     dim = 2
     model = MyModel(dim=dim, debug=False)
@@ -50,12 +54,12 @@ def test_sample():
     dim = 2
     model = MyModel(dim=dim, debug=False)
     dt = 0.1
-    model.set_stepper(dt, method='rk2')
-    # stepper = timestepper(model, dt)
+    step = model.get_stepper(dt, method='rk2')
+    adj_step = model.get_adjoint_stepper(dt, method='rk2')
     num_traj = 5
     n = 10
     def random_ic(): return np.random.randn(dim)
-    data = sample(model.step, random_ic, num_traj, n)
+    data = sample(step, random_ic, num_traj, n)
     assert len(data) == num_traj * n
     # for i,x in enumerate(data.traj):
     #     print("Trajectory %d\n-------------" % i)
@@ -64,7 +68,7 @@ def test_sample():
     s = 3  # samples per trajectory
     L = 5  # horizon for gradient sampling
     batch_size = 7
-    grad_data = sample_gradient(data, model, s, L)
+    grad_data = sample_gradient(data, adj_step, identity, model.num_outputs, s, L)
     assert len(grad_data) == num_traj * s
     dataloader = torch.utils.data.DataLoader(grad_data, batch_size=batch_size,
                                              shuffle=True)
@@ -72,7 +76,8 @@ def test_sample():
     assert X.shape == torch.Size([batch_size, dim])
     assert G.shape == torch.Size([batch_size, dim])
 
-    grad_data, D = sample_gradient_long_traj(data, model, s, L)
+    grad_data, D = sample_gradient_long_traj(data, adj_step, identity,
+                                             model.num_outputs, s, L)
     assert grad_data.G.shape == grad_data.X.shape
     assert len(D) == grad_data.G.shape[0]
 

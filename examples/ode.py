@@ -5,7 +5,6 @@ import romnet
 
 class Oscillator(romnet.Model):
     state_dim = 2
-    output_dim = 2
 
     def rhs(self, x):
         return np.array([x[1], -x[0]])
@@ -16,11 +15,17 @@ class Oscillator(romnet.Model):
 
 class Oscillator2(romnet.SemiLinearModel):
     state_dim = 2
-    output_dim = 2
     _linear = np.array([[0, -1], [1, 0]])
+
+    def linear(self, x):
+        return self._linear @ x
 
     def nonlinear(self, x):
         return np.array([0, 0])
+
+    def get_solver(self, alpha):
+        mat = np.eye(2) - alpha * self._linear
+        return romnet.LUSolver(mat)
 
 
 def bilinear_example(beta):
@@ -39,10 +44,10 @@ def simulate(scheme, model, x0, Tmax, xf):
     for n in npts:
         x = np.zeros((n+1, model.state_dim))
         dt = Tmax / n
-        model.set_stepper(dt, method=scheme)
+        step = model.get_stepper(dt, method=scheme)
         x[0] = x0
         for i in range(n):
-            x[i+1] = model.step(x[i])
+            x[i+1] = step(x[i])
         plt.plot(dt * np.arange(n+1), x[:, 0], label=f"n = {n}")
         err = x[n] - xf
         err = np.sqrt(np.dot(err, err))

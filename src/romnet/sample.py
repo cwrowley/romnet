@@ -85,7 +85,8 @@ def sample(step, random_state, num_traj, n):
     return TrajectoryList(traj_list)
 
 
-def sample_gradient(traj_list, model, samples_per_traj, L):
+def sample_gradient(traj_list, adj_step, adj_output, num_outputs,
+                    samples_per_traj, L):
     """Sample the gradient using the standard method discussed in Section 3 of
     [1].
 
@@ -110,23 +111,24 @@ def sample_gradient(traj_list, model, samples_per_traj, L):
     X = list()
     G = list()
     N = traj_list.n  # num pts in each trajectory
-    for k, x in enumerate(traj_list.traj):
-        for j in range(samples_per_traj):
+    for x in traj_list.traj:
+        for _ in range(samples_per_traj):
             # choose a time t in [0..N-1-L]
             t = np.random.randint(N - L)
             # choose a tau in [0..L]
             tau = np.random.randint(L + 1)
             # choose random direction eta for gradient
-            eta = np.sqrt(L + 1) * np.random.randn(model.num_outputs)
-            lam = model.adjoint_output(x[t + tau], eta)
+            eta = np.sqrt(L + 1) * np.random.randn(num_outputs)
+            lam = adj_output(x[t + tau], eta)
             for i in range(1, tau):
-                lam = model.adjoint_step(x[t + tau - i], lam)
+                lam = adj_step(x[t + tau - i], lam)
             X.append(x[t])
             G.append(lam)
     return GradientDataset(X, G)
 
 
-def sample_gradient_long_traj(traj_list, model, samples_per_traj, L):
+def sample_gradient_long_traj(traj_list, adj_step, adj_output, num_outputs,
+                              samples_per_traj, L):
     """Sample the gradient using the method of long trajectories discussed in
     Algorithm 3.1 of [1].
 
@@ -166,17 +168,17 @@ def sample_gradient_long_traj(traj_list, model, samples_per_traj, L):
         for j in range(samples_per_traj):
             t = np.random.randint(N - L)
             tau = np.random.randint(L + 1)
-            eta = np.sqrt(L + 1) * np.random.randn(model.num_outputs)
+            eta = np.sqrt(L + 1) * np.random.randn(num_outputs)
             tau_min = np.max((0, t + tau - (N - L - 1)))
             tau_max = np.min((L, t + tau))
             nu = 1 + tau_max - tau_min
             X_ = list()
             Lam = list()
             X_.append(x[t + tau])
-            Lam.append(model.adjoint_output(x[t + tau], eta))
+            Lam.append(adj_output(x[t + tau], eta))
             for i in range(1, tau_max):
                 X_.append(x[t + tau - i])
-                Lam.append(model.adjoint_step(x[t + tau - i], Lam[i - 1]))
+                Lam.append(adj_step(x[t + tau - i], Lam[i - 1]))
             X.extend(X_[tau_min:tau_max])
             G.extend(Lam[tau_min:tau_max])
             D.extend([1 / np.sqrt(nu)] * len(Lam[tau_min:tau_max]))

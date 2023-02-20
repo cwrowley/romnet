@@ -1,106 +1,80 @@
 """model - Define how a given state evolves in time."""
 
+from abc import ABC, abstractmethod
+from dataclasses import dataclass
+from functools import partial
+from typing import Optional, Union
+
 import numpy as np
 import torch
+from numpy.typing import ArrayLike
 from scipy.linalg import lu_factor, lu_solve
 
 from .timestepper import SemiImplicit, Timestepper
+from .typing import Vector, VectorField
 
-__all__ = ["Model", "SemiLinearModel", "BilinearModel", "LUSolver",
+__all__ = ["Model", "SemiLinearModel", "BilinearModel", "LUSolver", "project",
            "NetworkROM"]
 
 
-class Model:
+class Model(ABC):
     """
     Class defining an ODE dx/dt = f(x)
     """
 
-    def __init__(self, rhs=None, adjoint_rhs=None, output=None,
-                 adjoint_output=None):
-        if rhs is not None:
-            setattr(self, "rhs", rhs)
-        if adjoint_rhs is not None:
-            setattr(self, "adjoint_rhs", adjoint_rhs)
-        if adjoint_rhs is not None:
-            setattr(self, "output", output)
-        if adjoint_rhs is not None:
-            setattr(self, "adjoint_output", adjoint_output)
-
-    def rhs(self, x):
+    @abstractmethod
+    def rhs(self, x: Vector) -> Vector:
         """Return the right-hand-side of the ODE x' = f(x)."""
 
-    def adjoint_rhs(self, x, v):
+    def adjoint_rhs(self, x: Vector, v: Vector) -> Vector:
         """For the right-hand-side function f(x), return Df(x)^T v."""
         raise NotImplementedError("Adjoint not implemented for class %s" %
                                   self.__class__.__name__)
 
-    def output(self, x):
-        """
-        Return output y = g(x).
-
-        Default output is y = x
-        """
-        return x
-
-    def adjoint_output(self, x, v):
-        """
-        For output y = g(x), return Dg(x)^T v.
-
-        Default output is y = x
-        """
-        return v
-
-    def step(self, x):
-        try:
-            return self.stepper.step(x, self.rhs)
-        except AttributeError:
-            raise AttributeError("Timestepper not defined")
-
-    def adjoint_step(self, x, v):
-        def f(w):
-            return self.adjoint_rhs(x, w)
-        try:
-            return self.stepper.step(v, f)
-        except AttributeError:
-            raise AttributeError("Adjoint timestepper not defined")
-
-    def set_stepper(self, dt, method="rk2", **kwargs):
-        """Configure a timestepper for the model."""
+    def get_stepper(self, dt: float, method: str = "rk2") -> "DiscreteModel":
+        """Return a discrete-time model, for the given timestep."""
         cls = Timestepper.lookup(method)
-        self.stepper = cls(dt)
+        stepper = cls(dt)
+        return DiscreteModel(self.rhs, stepper)
 
-    def project(self, V, W=None):
-        """
-        Returns a reduced-order model that projects onto linear subspaces
+    def get_adjoint_stepper(self, dt: float, method: str = "rk2") -> "DiscreteAdjoint":
+        """Return a discrete-time model, for the given timestep."""
+        cls = Timestepper.lookup(method)
+        stepper = cls(dt)
+        return DiscreteAdjoint(self.adjoint_rhs, stepper)
 
-        Rows of V determine the subspace to project onto
-        Rows of W determine the direction of projection
 
-        That is, the projection is given by
-            V' (WV')^{-1} W
+def project(rhs: VectorField, V: ArrayLike, W: Optional[ArrayLike] = None):
+    """
+    Returns a reduced-order model that projects onto linear subspaces
 
-        The number of states in the reduced-order model is the number of rows
-        in V (or W).
+    Rows of V determine the subspace to project onto
+    Rows of W determine the direction of projection
 
-        If W is not specified, it is assumed W = V
-        """
-        n = len(V)
-        if W is None:
-            W = V
-        assert len(W) == n
+    That is, the projection is given by
+        V' (WV')^{-1} W
 
-        # Let W1 = (W V')^{-1} W
-        G = np.array([[np.dot(W[i], V[j]) for j in range(n)]
-                     for i in range(n)])
-        W1 = np.linalg.solve(G, W)
-        # Now projection is given by P = V' W1, and W1 V' = Identity
+    The number of states in the reduced-order model is the number of rows
+    in V (or W).
 
-        def rom_rhs(z):
-            x = sum((mode * c for mode, c in zip(V, z)))
-            fx = self.rhs(x)
-            return np.array([np.dot(W1[i], fx) for i in range(len(W1))])
+    If W is not specified, it is assumed W = V
+    """
+    n = len(V)
+    if W is None:
+        W = V
+    assert len(W) == n
 
-        return Model(rom_rhs)
+    # Let W1 = (W V')^{-1} W
+    G = np.array([[np.dot(W[i], V[j]) for j in range(n)] for i in range(n)])
+    W1 = np.linalg.solve(G, W)
+    # Now projection is given by P = V' W1, and W1 V' = Identity
+
+    def rom_rhs(z):
+        x = sum((mode * c for mode, c in zip(V, z)))
+        fx = rhs(x)
+        return np.array([np.dot(W1[i], fx) for i in range(len(W1))])
+
+    return rom_rhs
 
 
 class SemiLinearModel(Model):
@@ -110,57 +84,68 @@ class SemiLinearModel(Model):
         x' = A x + N(x)
     """
 
-    def linear(self, x):
-        return self._linear.dot(x)
+    @abstractmethod
+    def linear(self, x: Vector):
+        """Return the linear part A x."""
+        ...
 
-    def nonlinear(self, x):
-        pass
+    @abstractmethod
+    def nonlinear(self, x: Vector):
+        """Return the nonlinear part N(x)."""
+        ...
 
-    def rhs(self, x):
+    @abstractmethod
+    def get_solver(self, alpha: float):
+        """Return a solver for the linear part
+
+        The returned solver is a callable object that, when called with
+        argument b, returns a solution of the system
+
+            x - alpha * linear(x) = b
+        """
+        ...
+
+    def rhs(self, x: Vector):
         return self.linear(x) + self.nonlinear(x)
 
-    def adjoint(self, x):
-        return self._linear.T.dot(x)
+    def adjoint(self, x: Vector):
+        """Return the adjoint of the linear part A^T x."""
+        raise NotImplementedError("Adjoint not implemented for class %s" %
+                                  self.__class__.__name__)
 
-    def adjoint_nonlinear(self, x, v):
+    def get_adjoint_solver(self, alpha: float):
+        """Return a solver for the adjoint of the linear part
+
+        The returned solver is a callable object that, when called with
+        argument b, returns a solution of the system
+
+            x - alpha * adjoint(x) = b
+        """
+        raise NotImplementedError("Adjoint not implemented for class %s" %
+                                  self.__class__.__name__)
+    def adjoint_nonlinear(self, x: Vector, v: Vector):
         """Return the adjoint of DN(x) applied to the vector v"""
         raise NotImplementedError("Adjoint not implemented for class %s" %
                                   self.__class__.__name__)
 
-    def adjoint_rhs(self, x, v):
+    def adjoint_rhs(self, x: Vector, v: Vector):
         return self.adjoint(v) + self.adjoint_nonlinear(x, v)
 
-    def get_solver(self, alpha):
-        # default implementation, assumes matrix self._linear has been defined
-        nstates = self._linear.shape[0]
-        mat = np.eye(nstates) - alpha * self._linear
-        return LUSolver(mat)
-
-    def get_adjoint_solver(self, alpha):
-        # default implementation, assumes matrix self._linear has been defined
-        nstates = self._linear.shape[0]
-        mat = np.eye(nstates) - alpha * self._linear.T
-        return LUSolver(mat)
-
-    def set_stepper(self, dt, method="rk2cn"):
-        """Configure a timestepper for the semilinear model."""
-        if method in SemiImplicit.methods():
+    def get_stepper(self, dt: float, method: str = "rk2cn"):
+        try:
             cls = SemiImplicit.lookup(method)
-            self.stepper = cls(dt, self.linear, self.get_solver)
+        except NotImplementedError:
+            return super().get_stepper(dt, method)
+        stepper = cls(dt, self.linear, self.get_solver)
+        return DiscreteModel(self.nonlinear, stepper)
 
-            def step(x):
-                return self.stepper.step(x, self.nonlinear)
-            self.step = step
-            self.adjoint_stepper = cls(dt, self.adjoint,
-                                       self.get_adjoint_solver)
-
-            def adj_step(x, v):
-                def f(w):
-                    return self.adjoint_nonlinear(x, w)
-                return self.adjoint_stepper.step(v, f)
-            self.adjoint_step = adj_step
-        else:
-            super().set_stepper(dt, method=method)
+    def get_adjoint_stepper(self, dt: float, method: str = "rk2cn"):
+        try:
+            cls = SemiImplicit.lookup(method)
+        except NotImplementedError:
+            return super().get_adjoint_stepper(dt, method)
+        stepper = cls(dt, self.adjoint, self.get_adjoint_solver)
+        return DiscreteAdjoint(self.adjoint_nonlinear, stepper)
 
 
 class LUSolver:
@@ -173,10 +158,10 @@ class LUSolver:
     used when solving the system for a given right-hand side b.
     """
 
-    def __init__(self, mat):
+    def __init__(self, mat: ArrayLike):
         self.LU = lu_factor(mat)
 
-    def __call__(self, rhs):
+    def __call__(self, rhs: Vector):
         """Solve the system A x = rhs for x
 
         Args:
@@ -203,26 +188,34 @@ class BilinearModel(SemiLinearModel):
         B(array_like): rank-3 tensor describing the bilinear map B
     """
 
-    def __init__(self, c, L, B):
+    def __init__(self, c: ArrayLike, L: ArrayLike, B: ArrayLike):
         self._affine = np.array(c)
         self._linear = np.array(L)
         self._bilinear = np.array(B)
         self.state_dim = self._linear.shape[0]
 
-    def linear(self, x):
+    def linear(self, x: Vector):
         return self._linear.dot(x)
 
-    def adjoint(self, x):
+    def adjoint(self, x: Vector):
         return self._linear.T.dot(x)
 
-    def bilinear(self, a, b):
+    def get_solver(self, alpha: float):
+        mat = np.eye(self.state_dim) - alpha * self._linear
+        return LUSolver(mat)
+
+    def get_adjoint_solver(self, alpha: float):
+        mat = np.eye(self.state_dim) - alpha * self._linear.T
+        return LUSolver(mat)
+
+    def bilinear(self, a: Vector, b: Vector):
         """Evaluate the bilinear term B(a, b)"""
         return self._bilinear.dot(a).dot(b)
 
-    def nonlinear(self, x):
+    def nonlinear(self, x: Vector):
         return self._affine + self.bilinear(x, x)
 
-    def adjoint_nonlinear(self, x, v):
+    def adjoint_nonlinear(self, x: Vector, v: Vector):
         w = np.einsum("kji, j, k", self._bilinear, x, v)
         w += np.einsum("jik, j, k", self._bilinear, v, x)
         return w
@@ -272,6 +265,25 @@ class BilinearModel(SemiLinearModel):
                        for j in range(n)]
                       for i in range(n)])
         return BilinearModel(c, L, B)
+
+
+@dataclass
+class DiscreteModel:
+    rhs: VectorField
+    timestepper: Union[Timestepper, SemiImplicit]
+
+    def __call__(self, x: Vector):
+        return self.timestepper.step(x, self.rhs)
+
+
+@dataclass
+class DiscreteAdjoint:
+    adjoint_rhs: VectorField
+    timestepper: Union[Timestepper, SemiImplicit]
+
+    def __call__(self, x, v):
+        f = partial(self.adjoint_rhs, x)
+        return self.timestepper.step(v, f)
 
 
 class NetworkROM(Model):
