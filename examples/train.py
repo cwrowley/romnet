@@ -6,24 +6,50 @@ import sys
 import romnet
 
 
-def train_autoencoder(basename):
+def train_autoencoder(basename, train_num=""):
     # load data
     print(f"Loading data from {basename}_train.dat")
     training_data = romnet.load(basename + "_train.dat")
     test_data = romnet.load(basename + "_test.dat")
 
-    # train the autoencoder
+    # autoencoder hyperparameters by example
+    #   noack
+    learning_rate = 1.e-4
+    batch_size = 400
+    num_epochs = 750
+    dims = [3, 3, 3, 3, 3, 3, 2]
+    autoencoder = romnet.ProjAE(dims)
+    # gamma = 0
+    #   cgl
+    """
     learning_rate = 1.e-3
     batch_size = 64
     num_epochs = 50
     dims = [15, 15, 15, 15, 15, 14]
     autoencoder = romnet.ProjAE(dims)
     gamma = 1.e-3
+    """
 
+    # save initial weights
+    romnet.save_romnet(autoencoder, basename + train_num + "_initial" +
+                       ".romnet")
+
+    # load autoencoder
+    # autoencoder = romnet.load_romnet(basename + train_num + ".romnet")
+
+    # loss function
+    def loss_fn(X_pred, X, G):
+        loss = romnet.GAP_loss(X_pred, X, G)
+        # reg = gamma * autoencoder.regularizer()
+        return loss  # + reg
+    """
     def loss_fn(Xi_pred, X, G, XdotG):
         loss = romnet.reduced_GAP_loss(Xi_pred, X, G, XdotG)
         reg = gamma * autoencoder.regularizer()
         return loss + reg
+    """
+
+    # train autoencoder
     optimizer = torch.optim.Adam(autoencoder.parameters(), lr=learning_rate)
     train_dataloader = DataLoader(training_data,
                                   batch_size=batch_size, shuffle=True)
@@ -35,11 +61,16 @@ def train_autoencoder(basename):
         romnet.train_loop(train_dataloader, autoencoder, loss_fn, optimizer)
         romnet.test_loop(test_dataloader, autoencoder, loss_fn)
 
-    autoencoder.save(basename + ".romnet")
+    # save autoencoder
+    romnet.save_romnet(autoencoder, basename + train_num + ".romnet")
+
+    print("Done")
 
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:
         train_autoencoder("noack")
-    else:
+    elif len(sys.argv) == 2:
         train_autoencoder(sys.argv[1])
+    elif len(sys.argv) == 3:
+        train_autoencoder(sys.argv[1], "_" + sys.argv[2])

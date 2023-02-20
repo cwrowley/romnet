@@ -79,6 +79,7 @@ def sample(step, random_state, num_traj, n):
         traj.append(x)
         for t in range(n-1):
             x = step(x)
+            x = np.array(x)  # NetworkROM in torch
             traj.append(x)
         traj_list.append(traj)
     return TrajectoryList(traj_list)

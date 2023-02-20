@@ -3,7 +3,7 @@ from torch import nn
 import numpy as np
 from scipy.stats import ortho_group
 
-__all__ = ["ProjAE", "GAP_loss", "reduced_GAP_loss"]
+__all__ = ["ProjAE", "GAP_loss", "reduced_GAP_loss", "load_romnet", "save_romnet"]
 
 # for better compatibility with numpy arrays
 torch.set_default_dtype(torch.float64)
@@ -149,6 +149,16 @@ class ProjAE(nn.Module):
 
     def save(self, fname):
         torch.save(self, fname)
+
+
+def load_romnet(fname):
+    net = torch.load(fname)
+    net.update()
+    return net
+
+
+def save_romnet(autoencoder, fname):
+    torch.save(autoencoder, fname)
 
 
 def GAP_loss(X_pred, X, G):
