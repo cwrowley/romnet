@@ -93,7 +93,7 @@ class CoBRAS:
         self.Psi = np.dot(Y.T, self.U) / np.sqrt(self.s)
 
     def projectors(self) -> Tuple[NDArray[np.float64], NDArray[np.float64]]:
-        """Return Phi and Psi."""
+        """Return (Phi, Psi)"""
         return self.Phi, self.Psi
 
     def save_projectors(self, fname: str) -> None:
@@ -130,6 +130,11 @@ class CoBRAS:
             state, projected gradient, and state-gradient inner product,
             respectfully.
         """
+        if len(X) != len(G):
+            raise RuntimeError(
+                "The number of samples in X and G are different with sample"
+                + " numbers {} and {}".format(X.shape[0], G.shape[0])
+            )
         XdotG = np.array([np.dot(x, g) for x, g in zip(X, G)])
         Xproj = X @ self.Psi[:, :rank]
         Gproj = G @ self.Phi[:, :rank]

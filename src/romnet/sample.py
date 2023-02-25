@@ -7,7 +7,8 @@ from torch.utils.data import Dataset
 
 from .typing import Vector, VectorField
 
-__all__ = ["sample", "sample_gradient", "load", "sample_gradient_long_traj"]
+__all__ = ["sample", "sample_gradient", "load", "sample_gradient_long_traj",
+           "TrajectoryList"]
 
 
 class TrajectoryList(Dataset[Vector]):
@@ -147,7 +148,7 @@ def sample_gradient_long_traj(
     adj_output: Callable[[Vector, Vector], Vector],
     num_outputs: int,
     samples_per_traj: int,
-    L: int,
+    L: int
 ) -> Tuple[GradientDataset, NDArray[np.float64]]:
     """Sample the gradient using the method of long trajectories discussed in
     Algorithm 3.1 of [1].
@@ -183,23 +184,26 @@ def sample_gradient_long_traj(
     X = list()
     G = list()
     D = list()
-    N = traj_list.n  # num pts in each trajectory
+    T = traj_list.n  # num pts in each trajectory
+    N = (T - 1) - L
     for x in traj_list.traj:
         for _ in range(samples_per_traj):
-            t = np.random.randint(N - L)
+            t = np.random.randint(N + 1)
             tau = np.random.randint(L + 1)
             eta = np.sqrt(L + 1) * np.random.randn(num_outputs)
-            tau_min = np.max((0, t + tau - (N - L - 1)))
+            tau_min = np.max((0, t + tau - N))
             tau_max = np.min((L, t + tau))
             nu = 1 + tau_max - tau_min
             X_ = list()
             Lam = list()
             X_.append(x[t + tau])
             Lam.append(adj_output(x[t + tau], eta))
-            for i in range(1, tau_max):
+            for i in range(1, tau_max + 1):
                 X_.append(x[t + tau - i])
                 Lam.append(adj_step(x[t + tau - i], Lam[i - 1]))
-            X.extend(X_[tau_min:tau_max])
-            G.extend(Lam[tau_min:tau_max])
-            D.extend([1 / np.sqrt(nu)] * len(Lam[tau_min:tau_max]))
-    return GradientDataset(X, G), np.array(D).reshape(-1, 1)
+            X.extend(X_[tau_min:tau_max + 1])
+            G.extend(Lam[tau_min:tau_max + 1])
+            D.extend([1 / np.sqrt(nu)] * nu)
+    s_g = samples_per_traj * traj_list.num_traj
+    D = np.array(D).reshape(-1, 1) / np.sqrt(s_g)
+    return GradientDataset(X, G), D
