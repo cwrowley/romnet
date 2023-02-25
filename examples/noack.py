@@ -211,11 +211,11 @@ def test_rom(train_num="", savefig=False):
 
 if __name__ == "__main__":
     """
-    noack.py --- generate data
-    noack.py rom --- generate rom trajectories
-    noack.py rom i --- generate rom trajectories for autoencoder i
-    noack.py test --- test autoencoder
-    noack.py test i --- test autoencoder i
+    noack.py                --- generate data
+    noack.py rom            --- generate rom trajectories
+    noack.py rom i          --- generate rom trajectories for autoencoder i
+    noack.py test           --- test autoencoder
+    noack.py test i         --- test autoencoder i
     noack.py test i savefig --- test autoencoder i and save figures
     """
     if len(sys.argv) < 2:

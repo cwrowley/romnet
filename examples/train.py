@@ -14,22 +14,22 @@ def train_autoencoder(basename, train_num=""):
     test_data = romnet.load(basename + "_test.dat")
 
     # autoencoder hyperparameters by example
-    #   noack
-    learning_rate = 1.0e-4
+    #   1. noack
+    """
+    learning_rate = 1.e-4
     batch_size = 400
-    num_epochs = 750
-    dims = [3, 3, 3, 3, 3, 3, 2]
+    num_epochs = 1000
+    dims = [3, 3, 3, 3, 3, 3, 3, 2]
     autoencoder = romnet.ProjAE(dims)
     # gamma = 0
-    #   cgl
     """
-    learning_rate = 1.e-3
-    batch_size = 64
-    num_epochs = 50
-    dims = [15, 15, 15, 15, 15, 14]
+    #   2. cgl
+    learning_rate = 1.e-6
+    batch_size = 600
+    num_epochs = 1
+    dims = [15, 14]
     autoencoder = romnet.ProjAE(dims)
-    gamma = 1.e-3
-    """
+    # gamma = 0
 
     # save initial weights
     romnet.save_romnet(autoencoder, basename + train_num + "_initial" + ".romnet")
@@ -38,17 +38,18 @@ def train_autoencoder(basename, train_num=""):
     # autoencoder = romnet.load_romnet(basename + train_num + ".romnet")
 
     # loss function
+    #   1. GAP loss
+    """
     def loss_fn(X_pred, X, G):
         loss = romnet.GAP_loss(X_pred, X, G)
         # reg = gamma * autoencoder.regularizer()
         return loss  # + reg
-
     """
-    def loss_fn(Xi_pred, X, G, XdotG):
-        loss = romnet.reduced_GAP_loss(Xi_pred, X, G, XdotG)
-        reg = gamma * autoencoder.regularizer()
-        return loss + reg
-    """
+    #   2. reduced GAP loss
+    def loss_fn(X_pred, X, G, XdotG):
+        loss = romnet.reduced_GAP_loss(X_pred, X, G, XdotG)
+        # reg = gamma * autoencoder.regularizer()
+        return loss  # + reg
 
     # train autoencoder
     optimizer = torch.optim.Adam(autoencoder.parameters(), lr=learning_rate)
