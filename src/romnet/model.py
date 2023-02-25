@@ -158,6 +158,76 @@ class SemiLinearModel(Model):
         stepper = cls(dt, self.adjoint, self.get_adjoint_solver)
         return DiscreteAdjoint(self.adjoint_nonlinear, stepper)
 
+    def project(
+        self,
+        V: VectorList,
+        W: Optional[VectorList] = None
+    ) -> "SemiLinearModel":
+        """Return a reduced-order model by projecting onto linear subspaces
+
+        Rows of V determine the subspace to project onto, and
+        rows of W determine the direction of projection
+
+        That is, the projection is given by
+
+        .. math:: V^T (WV^T)^{-1} W
+
+        The number of states in the reduced-order model is the number of rows
+        in V (or W).
+
+        Args:
+            V (list): List of modes to project onto.
+                The model is projected onto a subspace spanned by the elements
+                of this list.
+            W (list): List of adjoint modes.
+                The nullspace of the projection is the orthogonal complement
+                of the subspace spanned by the elements of W.
+                If not specified, an orthogonal projection is used (W = V)
+
+        Returns:
+            A :class:`SemiLinearModel` containing the desired projection. In
+            particular, the reduced-order model is described by
+
+            .. math:: \\dot{z} = (WV^T)^{-1} W A V^T z + (WV^T)^{-1} W N(V^T z).
+        """
+        n = len(V)
+        if W is None:
+            W = V
+        assert len(W) == n
+
+        # Let W1 = (W V')^{-1} W
+        G = np.array([[np.dot(W[i], V[j]) for j in range(n)] for i in range(n)])
+        W1 = np.linalg.solve(G, W)
+
+        # Now projection is given by P = V' W1, and W1 V' = Identity
+        A_rom = np.array(
+            [[np.dot(W1[i], self.linear(V[j])) for j in range(n)] for i in range(n)]
+        )
+
+        def nonlinear_rom(z: Vector) -> Vector:
+            x = sum(mode * c for mode, c in zip(V, z))
+            fx = self.nonlinear(x)
+            return np.array([np.dot(W1[i], fx) for i in range(len(W1))])
+
+        class SemilinearROM(SemiLinearModel):
+
+            def __init__(self) -> None:
+                self._linear = A_rom
+                self._nonlinear = nonlinear_rom
+                self.state_dim = n
+
+            def linear(self, z: Vector) -> Vector:
+                return self._linear @ z
+
+            def nonlinear(self, z: Vector) -> Vector:
+                return self._nonlinear(z)
+
+            def get_solver(self, alpha: float) -> Callable[[Vector], Vector]:
+                mat = np.eye(self.state_dim) - alpha * self._linear
+                return LUSolver(mat)
+
+        return SemilinearROM()
+
 
 class LUSolver:
     """A class for solving linear systems A x = b

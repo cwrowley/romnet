@@ -61,7 +61,7 @@ def compare_timesteppers():
 
     y1 = model.output(q1.T).T
     y2 = model.output(q2.T).T
-    y3 = model.output(sol.y).T
+    y3 = model.output(sol.y_traj).T
     plt.figure()
     plt.plot(t1, y1[:, 0], label=method1)
     plt.plot(t2, y2[:, 0], label=method2)
@@ -114,37 +114,32 @@ def generate_data():
     Phi, Psi = cobras.projectors()
     Phi = Phi[:, :rank]
     Psi = Psi[:, :rank]
-    rom_rhs = romnet.project(model.rhs, Phi.T, Psi.T)
-    z_rom = []
-    print("Generating CoBRAS rom trajectories...")
-    for i in range(num_test):
-        z0 = test_traj.traj[i, 0, :] @ Psi
-        sol = solve_ivp(
-            lambda _, z: rom_rhs(z),
-            # jac=lambda t, q: model.jac(q),
-            t_span=[0, t_final],
-            y0=z0,
-            t_eval=t,
-            method="BDF",
-        )
-        z_rom.append(sol.y.T)
-    z_rom = np.array(z_rom)
-    y = test_traj.traj @ model.C.T
-    y_rom = z_rom @ Phi.T @ model.C.T
-    error = np.square(np.linalg.norm(y - y_rom, axis=2))
-    E_avg = np.mean(np. square(np.linalg.norm(y, axis=2)))
+    rom = model.project(Phi.T, Psi.T)
+    rom_step = rom.get_stepper(dt, method="rk3cn")
+    z_ics = test_traj.traj[:, 0, :] @ Psi
+    z_ics_iter = iter(z_ics)
+
+    def z_ic():
+        return next(z_ics_iter)
+    z_rom_traj = romnet.sample(rom_step, z_ic, num_test, n)
+    y_traj = test_traj.traj @ model.C.T
+    y_rom_traj = z_rom_traj.traj @ Phi.T @ model.C.T
+    error = np.square(np.linalg.norm(y_traj - y_rom_traj, axis=2))
+    E_avg = np.mean(np. square(np.linalg.norm(y_traj, axis=2)))
     fig = plt.figure()
     ax = fig.add_subplot(2, 1, 1)
     ax.semilogy(t, (error / E_avg).T)
-    ax.set_ylabel("$\\frac{|| y_{rom} - y ||}{E_{avg}}$")
+    ax.set_ylabel("$\\frac{|| y_{rom} - y_traj ||}{E_{avg}}$")
     ax = fig.add_subplot(2, 1, 2)
-    ax.plot(t, y[0, :, 0], label="FOM")
-    ax.plot(t, y_rom[0, :, 0], label="ROM", linestyle='--')
+    ax.plot(t, y_traj[0, :, 0], label="FOM")
+    ax.plot(t, y_rom_traj[0, :, 0], label="ROM", linestyle='--')
     ax.set_xlabel("$t$")
-    ax.set_ylabel("$Re(y)$")
+    ax.set_ylabel("$Re(y_traj)$")
     ax.legend()
+    plt.show()
 
     # ProjectedGradientDataset
+    print("Generating the projected gradient dataset...")
     reduced_training_data = cobras.project(training_data.X, training_data.G, rank)
     reduced_testing_data = cobras.project(test_data.X, test_data.G, rank)
     reduced_training_data.save("cgl_train.dat")
