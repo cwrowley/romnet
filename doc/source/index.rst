@@ -16,6 +16,13 @@ Welcome to romnet's documentation!
 
 .. currentmodule:: romnet
 
+Autoencoder classes
+===================
+.. autosummary::
+   :toctree: generated/
+
+   NetworkROM
+
 Model classes
 =============
 .. autosummary::

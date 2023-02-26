@@ -5,9 +5,11 @@ import torch
 from scipy.stats import ortho_group
 from torch import Tensor, nn
 
-from .typing import Vector
+from .typing import Vector, VectorField
+from .model import Model
 
-__all__ = ["ProjAE", "GAP_loss", "reduced_GAP_loss", "load_romnet", "save_romnet"]
+__all__ = ["ProjAE", "GAP_loss", "reduced_GAP_loss", "load_romnet", "save_romnet",
+           "NetworkROM"]
 
 # for better compatibility with numpy arrays
 torch.set_default_dtype(torch.float64)
@@ -181,3 +183,59 @@ def GAP_loss(X_pred: Tensor, X: Tensor, G: Tensor) -> Tensor:
 
 def reduced_GAP_loss(X_pred: Tensor, X: Tensor, G: Tensor, XdotG: Tensor) -> Tensor:
     return torch.mean(torch.square(XdotG - torch.sum(G * X_pred, dim=1)))
+
+
+class NetworkROM(Model):
+    """
+    Return a reduced-order model that projects the dynamics onto the range of
+    a romnet autoencoder.
+
+    The romnet autoencoder is a a differentiable idempotent operator
+
+    .. math:: \\tilde x = P(x) = \\psi_d(\\psi_e(x)),
+
+    where
+
+    .. math:: z = \\psi_e(x), \\quad \\tilde x = \\psi_d(z)
+
+    are the encoder and decoder, respectively. The reduced-order model in
+    state space is given by
+
+    .. math:: \\dot{\\tilde{x}} = \\mathrm{D}_x P(\\tilde x) f(\\tilde x),
+
+    and in the latent space by
+
+    .. math:: \\dot z = h(z) = \\mathrm{D}_x \\psi_e(\\psi_d(z)) f(\\psi_d(z)),
+
+    where
+
+    .. math:: \\dot x = f(x)
+
+    is the full-order model.
+
+    Attributes:
+        _rhs (VectorField): Right hand side of the full-order model.
+        autoencoder (ProjAE): Romnet autoencoder used in reduced-order model.
+
+    Note:
+        Torch gradient information is not preserved.
+    """
+
+    def __init__(self, rhs: VectorField, autoencoder: "ProjAE") -> None:
+        self._rhs = rhs
+        self.autoencoder = autoencoder
+
+    def rhs(self, z: TVector) -> Vector:
+        """Return the right-hand-side of the reduced-order model ODE in the
+        latent space, z' = h(z).
+        """
+        with torch.no_grad():
+            x = self.autoencoder.dec(z)
+            _, v = self.autoencoder.d_enc(x, self._rhs(x))
+            return v.numpy()
+
+    def adjoint_rhs(self, x: Vector, v: Vector) -> Vector:
+        """For the right-hand-side of the reduced-order model ODE in the
+        latent space h(z), return Dh(z)^T v.
+        """
+        return super().adjoint_rhs(x, v)

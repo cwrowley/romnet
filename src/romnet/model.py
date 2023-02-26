@@ -6,15 +6,13 @@ from functools import partial
 from typing import Callable, Optional, Union
 
 import numpy as np
-import torch
 from numpy.typing import ArrayLike
 from scipy.linalg import lu_factor, lu_solve
 
 from .timestepper import SemiImplicit, Timestepper
 from .typing import Vector, VectorField, VectorList
 
-__all__ = ["Model", "SemiLinearModel", "BilinearModel", "LUSolver", "project",
-           "NetworkROM"]
+__all__ = ["Model", "SemiLinearModel", "BilinearModel", "LUSolver", "project"]
 
 
 class Model(ABC):
@@ -315,10 +313,10 @@ class BilinearModel(SemiLinearModel):
         in V (or W).
 
         Args:
-            V(list): List of modes to project onto.
+            V (list): List of modes to project onto.
                 The model is projected onto a subspace spanned by the elements
                 of this list.
-            W(list): List of adjoint modes.
+            W (list): List of adjoint modes.
                 The nullspace of the projection is the orthogonal complement
                 of the subspace spanned by the elements of W.
                 If not specified, an orthogonal projection is used (W = V)
@@ -369,34 +367,3 @@ class DiscreteAdjoint:
     def __call__(self, x: Vector, v: Vector) -> Vector:
         f = partial(self.adjoint_rhs, x)
         return self.timestepper.step(v, f)
-
-
-class NetworkROM(Model):
-    """
-    A reduced-order model that projects onto the range of a romnet autoencoder
-
-    Torch gradient information is not preserved
-
-    The rom neural network is a differentiable idempotent operator
-    P(x) = psid(psie(x)), where z = psie(x)
-
-    The reduced-order model in state space is given by
-    xdot = DP(x)f(x)
-
-    The reduced-order model in the latent space is given by
-    zdot = Dpsie(psid(z))f(psid(z))
-    """
-
-    # NOTE: adding type annotation would introduce a dependency on autoencoder
-    # Probably better to rearrange this -- no reason for this to take a Model
-    # now; better to just take rhs as an argument
-    # Should probably move this to autoencoder.py
-    def __init__(self, model, autoencoder):
-        self.model = model
-        self.autoencoder = autoencoder
-
-    def rhs(self, z: Vector) -> Vector:
-        with torch.no_grad():
-            x = self.autoencoder.dec(z)
-            _, v = self.autoencoder.d_enc(x, self.model.rhs(x))
-            return v.numpy()

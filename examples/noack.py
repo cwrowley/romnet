@@ -67,7 +67,7 @@ def rom(train_num=""):
     # romnet
     model = NoackModel(mu=0.1, omega=1.0, A=-0.1, lam=10)
     autoencoder = romnet.load_romnet("noack" + train_num + ".romnet")
-    rom = romnet.NetworkROM(model, autoencoder)
+    rom = romnet.NetworkROM(model.rhs, autoencoder)
 
     # generating rom trajectories
     dt = 0.1

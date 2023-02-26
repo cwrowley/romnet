@@ -79,8 +79,8 @@ class CoBRAS:
         """Calculate U, s, VH, Phi, and Psi.
 
         Args:
-            X (ndarray): state sample matrix where X[i] is the ith state sample.
-            Y (ndarray): gradient sample matrix where Y[i] is ith gradient
+            X (ndarray): State sample matrix where X[i] is the ith state sample.
+            Y (ndarray): Gradient sample matrix where Y[i] is ith gradient
                 sample.
 
         Note:
@@ -101,6 +101,11 @@ class CoBRAS:
         with open(fname, "wb") as fp:
             pickle.dump((self.Phi, self.Psi), fp, pickle.HIGHEST_PROTOCOL)
 
+    def load_projectors(self, fname: str) -> None:
+        """Load the tuple (Phi, Psi)"""
+        with open(fname, "rb") as fp:
+            return pickle.load(fp)
+
     def project(
         self, X: NDArray[np.float64], G: NDArray[np.float64], rank: int
     ) -> ProjectedGradientDataset:
@@ -108,11 +113,11 @@ class CoBRAS:
         and adjoint modes, Psi.
 
         Args:
-            X (ndarray): non-normalized state sample matrix where X[i] is the
+            X (ndarray): Non-normalized state sample matrix where X[i] is the
                 ith state sample.
-            G (ndarray): non-normalized gradient sample matrix where G[i] is
+            G (ndarray): Non-normalized gradient sample matrix where G[i] is
                 the ith gradient sample.
-            rank (int): the number of leading direct and adjoint modes used.
+            rank (int): The number of leading direct and adjoint modes used.
 
         Returns:
             ProjectedGradientDataset: A data structure of gradient and state
