@@ -101,11 +101,6 @@ class CoBRAS:
         with open(fname, "wb") as fp:
             pickle.dump((self.Phi, self.Psi), fp, pickle.HIGHEST_PROTOCOL)
 
-    def load_projectors(self, fname: str) -> None:
-        """Load the tuple (Phi, Psi)"""
-        with open(fname, "rb") as fp:
-            return pickle.load(fp)
-
     def project(
         self, X: NDArray[np.float64], G: NDArray[np.float64], rank: int
     ) -> ProjectedGradientDataset:

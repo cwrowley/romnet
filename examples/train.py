@@ -27,7 +27,7 @@ def train_autoencoder(basename, train_num=""):
     learning_rate = 1.e-6
     batch_size = 600
     num_epochs = 1
-    dims = [15, 14]
+    dims = [15, 15]
     autoencoder = romnet.ProjAE(dims)
     # gamma = 0
 

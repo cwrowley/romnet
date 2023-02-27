@@ -1,11 +1,11 @@
-from typing import List, Optional, Tuple, Union
+from typing import List, Optional, Tuple
 
 import numpy as np
 import torch
 from scipy.stats import ortho_group
 from torch import Tensor, nn
 
-from .typing import Vector, VectorField
+from .typing import Vector, VectorField, TVector
 from .model import Model
 
 __all__ = ["ProjAE", "GAP_loss", "reduced_GAP_loss", "load_romnet", "save_romnet",
@@ -13,8 +13,6 @@ __all__ = ["ProjAE", "GAP_loss", "reduced_GAP_loss", "load_romnet", "save_romnet
 
 # for better compatibility with numpy arrays
 torch.set_default_dtype(torch.float64)
-
-TVector = Union[Vector, Tensor]
 
 
 class LayerPair(nn.Module):

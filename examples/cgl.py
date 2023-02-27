@@ -1,11 +1,15 @@
 #!/usr/bin/env python
 
 import time
+import sys
 
 import matplotlib.pyplot as plt
 import numpy as np
 import romnet
 from romnet.models import CGL
+from romnet.typing import Vector, TVector
+from romnet.sample import TrajectoryList
+import torch
 from scipy.integrate import solve_ivp
 
 
@@ -119,7 +123,7 @@ def generate_data():
     z_ics = test_traj.traj[:, 0, :] @ Psi
     z_ics_iter = iter(z_ics)
 
-    def z_ic():
+    def z_ic() -> Vector:
         return next(z_ics_iter)
     z_rom_traj = romnet.sample(rom_step, z_ic, num_test, n)
     y_traj = test_traj.traj @ model.C.T
@@ -148,6 +152,77 @@ def generate_data():
     print("Done")
 
 
+def rom(train_num=""):
+    # loading data
+    print("Loading test trajectories...")
+    test_traj = romnet.load("cgl_test.traj")
+
+    # romnet
+    model = CGL()
+    autoencoder = romnet.load_romnet("cgl" + train_num + ".romnet")
+
+    # initial linear layers
+    Phi, Psi = romnet.load("cgl" + train_num + ".cobras")
+    rank = 15
+    Phi = Phi[:, :rank]
+    Psi = Psi[:, :rank]
+
+    # rom
+    def linear_rom_rhs(z1: TVector) -> Vector:
+        """Return right hand side of the linear projection reduced-order model
+        z1' = Phi^T f (Phi z1).
+        """
+        z1 = np.array(z1)
+        return model.rhs(z1 @ Phi.T) @ Psi
+    rom = romnet.NetworkROM(linear_rom_rhs, autoencoder)
+
+    # generating rom trajectories
+    print("Generating rom trajectories")
+    dt = 0.1
+    t_final = 100
+    t = dt * np.arange(0, t_final)
+    with torch.no_grad():
+        z_rom = []
+        for i in range(test_traj.num_traj):
+            q0 = autoencoder.enc(test_traj.traj[i, 0, :] @ Psi).numpy()
+            sol = solve_ivp(
+                lambda _, q: rom.rhs(q),
+                t_span=[0, t_final],
+                y0=q0,
+                t_eval=t,
+                method="BDF",
+            )
+            z_rom.append(sol.y.T)
+        z_rom_traj = TrajectoryList(z_rom)
+        print("Done")
+
+        z_rom_traj.save("cgl" + train_num + "_rom.traj")
+
+
+def test_rom(train_num="", savefig=False):
+    return None
+
+
 if __name__ == "__main__":
-    # compare_timesteppers()
-    generate_data()
+    """
+    cgl.py                --- generate data
+    cgl.py rom            --- generate rom trajectories
+    cgl.py rom i          --- generate rom trajectories for autoencoder i
+    cgl.py test           --- test autoencoder
+    cgl.py test i         --- test autoencoder i
+    cgl.py test i savefig --- test autoencoder i and save figures
+    """
+    if len(sys.argv) < 2:
+        generate_data()
+    elif sys.argv[1] == "rom":
+        if len(sys.argv) == 3:
+            rom("_" + sys.argv[2])
+        else:
+            rom()
+    elif sys.argv[1] == "test":
+        if len(sys.argv) == 3:
+            test_rom("_" + sys.argv[2])
+        elif (len(sys.argv) == 4) and (sys.argv[3] == "savefig"):
+            test_rom("_" + sys.argv[2], savefig=True)
+        else:
+            test_rom()
