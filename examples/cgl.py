@@ -172,7 +172,7 @@ def rom(train_num=""):
     autoencoder = romnet.load_romnet("cgl" + train_num + ".romnet")
 
     # initial linear layers
-    Phi, Psi = romnet.load("cgl" + train_num + ".cobras")
+    Phi, Psi = romnet.load("cgl.cobras")
     rank = 15
     Phi = Phi[:, :rank]
     Psi = Psi[:, :rank]
@@ -221,7 +221,7 @@ def test_rom(train_num="", savefig=False):
     autoencoder = romnet.load_romnet("cgl" + train_num + ".romnet")
 
     # initial linear layers
-    Phi, Psi = romnet.load("cgl" + train_num + ".cobras")
+    Phi, Psi = romnet.load("cgl.cobras")
     rank = 15
     Phi = Phi[:, :rank]
     Psi = Psi[:, :rank]
@@ -270,9 +270,10 @@ def test_rom(train_num="", savefig=False):
         fig.colorbar(c, ax=ax)
         ax.set_ylabel('$Re(q_{rom}(x,t))$')
         ax.set_xlabel("$t$")
+        if savefig:
+            fig.savefig("cgl" + train_num + "_heat.pdf", format="pdf")
 
         # plot normalized error
-        dt = 0.1
         fig = plt.figure()
         ax = fig.add_subplot(1, 1, 1)
         ax.set_ylim([1e-4, 100])
@@ -289,7 +290,7 @@ def test_rom(train_num="", savefig=False):
             )
             plt.plot(t, l2error * np.ones(n), color="blue", linestyle="--", linewidth=2)
         if savefig:
-            fig.savefig("noack" + train_num + "_error.pdf", format="pdf")
+            fig.savefig("cgl" + train_num + "_error.pdf", format="pdf")
 
         if not savefig:
             plt.show()
