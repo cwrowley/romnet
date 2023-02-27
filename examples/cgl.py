@@ -118,6 +118,8 @@ def generate_data():
     Phi, Psi = cobras.projectors()
     Phi = Phi[:, :rank]
     Psi = Psi[:, :rank]
+
+    # rom
     rom = model.project(Phi.T, Psi.T)
     rom_step = rom.get_stepper(dt, method="rk3cn")
     z_ics = test_traj.traj[:, 0, :] @ Psi
@@ -126,6 +128,8 @@ def generate_data():
     def z_ic() -> Vector:
         return next(z_ics_iter)
     z_rom_traj = romnet.sample(rom_step, z_ic, num_test, n)
+
+    # normalized error and real-part output plot
     y_traj = test_traj.traj @ model.C.T
     y_rom_traj = z_rom_traj.traj @ Phi.T @ model.C.T
     error = np.square(np.linalg.norm(y_traj - y_rom_traj, axis=2))
@@ -134,6 +138,7 @@ def generate_data():
     ax = fig.add_subplot(2, 1, 1)
     ax.semilogy(t, (error / E_avg).T)
     ax.set_ylabel("$\\frac{|| y_{rom} - y_traj ||}{E_{avg}}$")
+    ax.set_xlabel("$t$")
     ax = fig.add_subplot(2, 1, 2)
     ax.plot(t, y_traj[0, :, 0], label="FOM")
     ax.plot(t, y_rom_traj[0, :, 0], label="ROM", linestyle='--')
@@ -141,6 +146,11 @@ def generate_data():
     ax.set_ylabel("$Re(y_traj)$")
     ax.legend()
     plt.show()
+
+    # average normalized error
+    error_norm = error / E_avg
+    l2error = np.mean(error_norm)
+    print("Normalized l2 error: ", l2error)
 
     # ProjectedGradientDataset
     print("Generating the projected gradient dataset...")
@@ -180,7 +190,8 @@ def rom(train_num=""):
     print("Generating rom trajectories")
     dt = 0.1
     t_final = 100
-    t = dt * np.arange(0, t_final)
+    n = int(t_final / dt) + 1
+    t = dt * np.arange(n)
     with torch.no_grad():
         z_rom = []
         for i in range(test_traj.num_traj):
@@ -200,7 +211,88 @@ def rom(train_num=""):
 
 
 def test_rom(train_num="", savefig=False):
-    return None
+    # loading data
+    print("Loading test trajectories...")
+    test_traj = romnet.load("cgl_test.traj")
+    z_rom_traj = romnet.load("cgl" + train_num + "_rom.traj")
+
+    # romnet
+    model = CGL()
+    autoencoder = romnet.load_romnet("cgl" + train_num + ".romnet")
+
+    # initial linear layers
+    Phi, Psi = romnet.load("cgl" + train_num + ".cobras")
+    rank = 15
+    Phi = Phi[:, :rank]
+    Psi = Psi[:, :rank]
+
+    with torch.no_grad():
+
+        # average normalized l2 error
+        x_rom_traj = autoencoder.dec(z_rom_traj.traj).numpy() @ Phi.T
+        error = np.square(np.linalg.norm(test_traj.traj - x_rom_traj, axis=2))
+        E_avg = np.mean(np. square(np.linalg.norm(test_traj.traj, axis=2)))
+        error_norm = error / E_avg
+        l2error = np.mean(error_norm)
+        print("Normalized l2 error: ", l2error)
+
+        # plot real-part output
+        y_rom_traj = x_rom_traj @ model.C.T
+        y_traj = test_traj.traj @ model.C.T
+        dt = 0.1
+        t_final = 100
+        n = int(t_final / dt) + 1
+        t = dt * np.arange(n)
+        fig = plt.figure()
+        ax = fig.add_subplot(1, 1, 1)
+        ax.plot(t, y_traj[0, :, 0], label="FOM")
+        ax.plot(t, y_rom_traj[0, :, 0], label="ROM")
+        ax.set_ylabel("$Re(y)$")
+        ax.set_xlabel("$t$")
+        ax.legend()
+        if savefig:
+            fig.savefig("cgl" + train_num + "_output.pdf", format="pdf")
+
+        # plot real-part heat map
+        fig = plt.figure()
+        ax = fig.add_subplot(2, 1, 1)
+        c = ax.pcolormesh(
+                t, model.xi / model.chi, test_traj.traj[0, :, 0:model.nx].T,
+                cmap='bwr', vmin=-2.0, vmax=2.0
+        )
+        fig.colorbar(c, ax=ax)
+        ax.set_ylabel('$Re(q(x,t))$')
+        ax = fig.add_subplot(2, 1, 2)
+        c = ax.pcolormesh(
+                t, model.xi / model.chi, x_rom_traj[0, :, 0:model.nx].T,
+                cmap='bwr', vmin=-2.0, vmax=2.0
+        )
+        fig.colorbar(c, ax=ax)
+        ax.set_ylabel('$Re(q_{rom}(x,t))$')
+        ax.set_xlabel("$t$")
+
+        # plot normalized error
+        dt = 0.1
+        fig = plt.figure()
+        ax = fig.add_subplot(1, 1, 1)
+        ax.set_ylim([1e-4, 100])
+        ax.set_yscale("log")
+        ax.set_ylabel("$\\frac{|| y_{rom} - y_traj ||}{E_{avg}}$")
+        ax.set_xlabel("$t$")
+        ax.plot(t, error_norm.T, color="blue", linewidth=0.5, alpha=0.5)
+        if np.isnan(l2error):
+            plt.text(t[-1], 100 * 0.80, r"       $\infty$", fontsize=9)
+            plt.plot(t, 90 * np.ones(n), color="blue", linestyle="--", linewidth=2)
+        else:
+            plt.text(
+                t[-1], l2error * 0.90, "       " + str(100 * l2error) + "%", fontsize=9
+            )
+            plt.plot(t, l2error * np.ones(n), color="blue", linestyle="--", linewidth=2)
+        if savefig:
+            fig.savefig("noack" + train_num + "_error.pdf", format="pdf")
+
+        if not savefig:
+            plt.show()
 
 
 if __name__ == "__main__":

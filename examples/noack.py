@@ -97,11 +97,11 @@ def test_rom(train_num="", savefig=False):
 
     with torch.no_grad():
 
-        # normalized l2 error
+        # average normalized error
         x_rom_traj = autoencoder.dec(z_rom_traj.traj).numpy()
-        error = np.linalg.norm(test_traj.traj - x_rom_traj, axis=2)
-        norm = np.linalg.norm(test_traj.traj, axis=2)
-        error_norm = error / norm
+        error = np.square(np.linalg.norm(test_traj.traj - x_rom_traj, axis=2))
+        E_avg = np.mean(np. square(np.linalg.norm(test_traj.traj, axis=2)))
+        error_norm = error / E_avg
         l2error = np.mean(error_norm)
         print("Normalized l2 error: ", l2error)
 
@@ -185,7 +185,7 @@ def test_rom(train_num="", savefig=False):
         if savefig:
             fig.savefig("noack" + train_num + "_trajRr.pdf", format="pdf")
 
-        # plot l2-normalized error time trace
+        # plot normalized error time trace
         dt = 0.1
         n = 200
         fig = plt.figure()
@@ -202,6 +202,8 @@ def test_rom(train_num="", savefig=False):
                 t[-1], l2error * 0.90, "       " + str(100 * l2error) + "%", fontsize=9
             )
             plt.plot(t, l2error * np.ones(n), color="blue", linestyle="--", linewidth=2)
+        ax.set_ylabel("$\\frac{|| y_{rom} - y_traj ||}{E_{avg}}$")
+        ax.set_xlabel("$t$")
         if savefig:
             fig.savefig("noack" + train_num + "_error.pdf", format="pdf")
 
