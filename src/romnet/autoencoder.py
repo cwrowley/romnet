@@ -229,7 +229,8 @@ class NetworkROM(Model):
         """
         with torch.no_grad():
             x = self.autoencoder.dec(z)
-            _, v = self.autoencoder.d_enc(x, self._rhs(x))
+            fx = self._rhs(x.numpy())
+            _, v = self.autoencoder.d_enc(x, fx)
             return v.numpy()
 
     def adjoint_rhs(self, x: Vector, v: Vector) -> Vector:

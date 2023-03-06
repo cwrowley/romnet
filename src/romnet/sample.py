@@ -205,5 +205,4 @@ def sample_gradient_long_traj(
             G.extend(Lam[tau_min:tau_max + 1])
             D.extend([1 / np.sqrt(nu)] * nu)
     s_g = samples_per_traj * traj_list.num_traj
-    D = np.array(D).reshape(-1, 1) / np.sqrt(s_g)
-    return GradientDataset(X, G), D
+    return GradientDataset(X, G), np.array(D).reshape(-1, 1) / np.sqrt(s_g)
