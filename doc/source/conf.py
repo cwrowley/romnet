@@ -6,9 +6,6 @@
 # -- Project information -----------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
-import sys
-sys.path.append('C:/Users/grego/OneDrive/Documents/3. Extracurricular/Princeton MAE Graduate School/Learning Nonlinear Projections for Dynamical Systems Using Constrained Autoencoders/romnet/src')
-
 project = 'romnet'
 copyright = '2022, Clancy Rowley, Greg Macchio, Sam Otto'
 author = 'Clancy Rowley, Greg Macchio, Sam Otto'

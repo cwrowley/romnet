@@ -4,9 +4,12 @@ import sys
 
 import matplotlib.pyplot as plt
 import numpy as np
+from numpy.typing import NDArray
 import romnet
 import torch
+
 from romnet.models import NoackModel
+from romnet.typing import Vector
 
 
 def random_ic():
@@ -19,11 +22,11 @@ def random_ic():
     return np.array((x, y, z))
 
 
-def identity(x):
+def identity(x: Vector) -> Vector:
     return x
 
 
-def adj_output(x, eta):
+def adj_output(x: Vector, eta: Vector) -> Vector:
     return eta
 
 
@@ -59,7 +62,7 @@ def generate_data():
     test_data.save("noack_test.dat")
 
 
-def rom(train_num=""):
+def rom(train_num: str = ""):
     # loading data
     print("Loading test trajectories...")
     test_traj = romnet.load("noack_test.traj")
@@ -85,7 +88,7 @@ def rom(train_num=""):
         z_rom_traj.save("noack" + train_num + "_rom.traj")
 
 
-def test_rom(train_num="", savefig=False):
+def test_rom(train_num: str = "", savefig: bool = False):
     # loading data
     print("Loading test trajectories...")
     test_traj = romnet.load("noack_test.traj")
@@ -102,15 +105,15 @@ def test_rom(train_num="", savefig=False):
         error = np.square(np.linalg.norm(test_traj.traj - x_rom_traj, axis=2))
         E_avg = np.mean(np. square(np.linalg.norm(test_traj.traj, axis=2)))
         error_norm = error / E_avg
-        l2error = np.mean(error_norm)
-        print("Normalized l2 error: ", l2error)
+        avg_error = np.mean(error_norm)
+        print("Average normalized error: ", avg_error)
 
         # plot slow manifold
         fig = plt.figure()
         xmax = 1.5
         div = 20
 
-        def slow_manifold_input(xmax, div):
+        def slow_manifold_input(xmax: float, div: int):
             X1 = np.linspace(-xmax, xmax, div)
             X2 = np.linspace(-xmax, xmax, div)
             X = np.zeros((div * div, model.num_states))
@@ -127,7 +130,7 @@ def test_rom(train_num="", savefig=False):
         slow_m = slow_manifold_input(xmax, div)
         range_P = autoencoder.forward(slow_m).numpy()
 
-        def surface(X, div):
+        def surface(X: NDArray[np.float64], div: int):
             X1_graph = np.zeros((div, div))
             X2_graph = np.zeros((div, div))
             X3_graph = np.zeros((div, div))
@@ -185,7 +188,7 @@ def test_rom(train_num="", savefig=False):
         if savefig:
             fig.savefig("noack" + train_num + "_trajRr.pdf", format="pdf")
 
-        # plot normalized error time trace
+        # plot normalized error
         dt = 0.1
         n = 200
         fig = plt.figure()
@@ -194,14 +197,20 @@ def test_rom(train_num="", savefig=False):
         ax.set_yscale("log")
         t = np.arange(0, n, 1) * dt
         ax.plot(t, error_norm.T, color="blue", linewidth=0.5, alpha=0.5)
-        if np.isnan(l2error):
+        if np.isnan(avg_error):
             plt.text(t[-1], 100 * 0.80, r"       $\infty$", fontsize=9)
-            plt.plot(t, 90 * np.ones(n), color="blue", linestyle="--", linewidth=2)
+            plt.plot(
+                t, 90 * np.ones(n), color="blue", linestyle="--", linewidth=2
+            )
         else:
             plt.text(
-                t[-1], l2error * 0.90, "       " + str(100 * l2error) + "%", fontsize=9
+                t[-1], avg_error * 0.90, "       " + str(100 * avg_error) + "%",
+                fontsize=9
             )
-            plt.plot(t, l2error * np.ones(n), color="blue", linestyle="--", linewidth=2)
+            plt.plot(
+                t, avg_error * np.ones(n), color="blue", linestyle="--",
+                linewidth=2
+            )
         ax.set_ylabel("$\\frac{|| y_{rom} - y_traj ||}{E_{avg}}$")
         ax.set_xlabel("$t$")
         if savefig:

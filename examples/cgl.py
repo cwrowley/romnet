@@ -77,8 +77,6 @@ def compare_timesteppers():
 
 def generate_data():
 
-    np.random.seed(seed=0)
-
     # getting discrete model stepper
     model = CGL()
     dt = 0.1
@@ -149,8 +147,8 @@ def generate_data():
 
     # average normalized error
     error_norm = error / E_avg
-    l2error = np.mean(error_norm)
-    print("Normalized l2 error: ", l2error)
+    avg_error = np.mean(error_norm)
+    print("Average normalized error: ", avg_error)
 
     # ProjectedGradientDataset
     print("Generating the projected gradient dataset...")
@@ -162,7 +160,7 @@ def generate_data():
     print("Done")
 
 
-def rom(train_num=""):
+def rom(train_num: str = ""):
     # loading data
     print("Loading test trajectories...")
     test_traj = romnet.load("cgl_test.traj")
@@ -180,7 +178,7 @@ def rom(train_num=""):
     # rom
     def linear_rom_rhs(z1: TVector) -> Vector:
         """Return right hand side of the linear projection reduced-order model
-        z1' = Phi^T f (Phi z1).
+        z1' = Psi^T f (Phi z1).
         """
         z1 = np.array(z1)
         return model.rhs(z1 @ Phi.T) @ Psi
@@ -210,7 +208,7 @@ def rom(train_num=""):
         z_rom_traj.save("cgl" + train_num + "_rom.traj")
 
 
-def test_rom(train_num="", savefig=False):
+def test_rom(train_num: str = "", savefig: bool = False):
     # loading data
     print("Loading test trajectories...")
     test_traj = romnet.load("cgl_test.traj")
@@ -233,8 +231,8 @@ def test_rom(train_num="", savefig=False):
         error = np.square(np.linalg.norm(test_traj.traj - x_rom_traj, axis=2))
         E_avg = np.mean(np. square(np.linalg.norm(test_traj.traj, axis=2)))
         error_norm = error / E_avg
-        l2error = np.mean(error_norm)
-        print("Normalized l2 error: ", l2error)
+        avg_error = np.mean(error_norm)
+        print("Average normalized error: ", avg_error)
 
         # plot real-part output
         y_rom_traj = x_rom_traj @ model.C.T
@@ -278,19 +276,36 @@ def test_rom(train_num="", savefig=False):
         ax = fig.add_subplot(1, 1, 1)
         ax.set_ylim([1e-4, 100])
         ax.set_yscale("log")
-        ax.set_ylabel("$\\frac{|| y_{rom} - y_traj ||}{E_{avg}}$")
+        ax.set_ylabel("$\\frac{|| y_{rom} - y ||}{E_{avg}}$")
         ax.set_xlabel("$t$")
         ax.plot(t, error_norm.T, color="blue", linewidth=0.5, alpha=0.5)
-        if np.isnan(l2error):
+        if np.isnan(avg_error):
             plt.text(t[-1], 100 * 0.80, r"       $\infty$", fontsize=9)
             plt.plot(t, 90 * np.ones(n), color="blue", linestyle="--", linewidth=2)
         else:
             plt.text(
-                t[-1], l2error * 0.90, "       " + str(100 * l2error) + "%", fontsize=9
+                t[-1], avg_error * 0.90, "       " + str(100 * avg_error) + "%", fontsize=9
             )
-            plt.plot(t, l2error * np.ones(n), color="blue", linestyle="--", linewidth=2)
+            plt.plot(t, avg_error * np.ones(n), color="blue", linestyle="--", linewidth=2)
         if savefig:
             fig.savefig("cgl" + train_num + "_error.pdf", format="pdf")
+
+        # plot sample test trajectory in latent space (Rr)
+        fig = plt.figure()
+        ax = fig.add_subplot(1, 1, 1)
+        z_traj = autoencoder.enc(test_traj.traj @ Psi).numpy()
+        ax.plot(
+            z_traj[0, :, 0], z_traj[0, :, 1], color="blue", label="FOM"
+        )
+        ax.plot(
+            z_rom_traj.traj[0, :, 0], z_rom_traj.traj[0, :, 1],
+            color="red", label="ROM"
+        )
+        ax.legend()
+        ax.set_xlabel("$z_1$")
+        ax.set_ylabel("$z_2$")
+        if savefig:
+            fig.savefig("cgl" + train_num + "_trajRr.pdf", format="pdf")
 
         if not savefig:
             plt.show()
