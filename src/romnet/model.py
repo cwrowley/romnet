@@ -12,7 +12,7 @@ from scipy.linalg import lu_factor, lu_solve
 from .timestepper import SemiImplicit, Timestepper
 from .typing import Vector, VectorField, VectorList
 
-__all__ = ["Model", "SemiLinearModel", "BilinearModel", "LUSolver", "project"]
+__all__ = ["Model", "SemiLinearModel", "BilinearModel", "LUSolver", "project", "DiscreteModel"]
 
 
 class Model(ABC):
