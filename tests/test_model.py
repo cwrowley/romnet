@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 from romnet.autoencoder import ProjAE
-from romnet.model import BilinearModel, Model, NetworkROM, project
+from romnet.model import BilinearModel, Model, project
 
 
 @pytest.fixture
@@ -186,23 +186,6 @@ def autoencoder():
     """
     dims = [2, 2, 1]
     return ProjAE(dims)
-
-
-@pytest.fixture
-def network_rom(pitchfork, autoencoder):
-    return NetworkROM(pitchfork, autoencoder)
-
-
-def test_network_rom(pitchfork, autoencoder, network_rom):
-    x = np.random.randn(2)
-    z = autoencoder.enc(x)
-    Px = autoencoder(x).detach().numpy()
-    _, directoutput = autoencoder.d_autoenc(Px, pitchfork.rhs(Px))
-    directoutput = directoutput.detach().numpy()
-    rom_z = network_rom.rhs(z)
-    _, romoutput = autoencoder.d_dec(z, rom_z)
-    romoutput = romoutput.detach().numpy()
-    assert directoutput == pytest.approx(romoutput)
 
 
 def test_project_rom(pitchfork):

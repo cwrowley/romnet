@@ -87,7 +87,7 @@ def sample(
         traj.append(x)
         for _ in range(n - 1):
             x = step(x)
-            x = np.array(x)  # NetworkROM in torch
+            x = np.array(x)
             traj.append(x)
         traj_list.append(traj)
     return TrajectoryList(traj_list)
