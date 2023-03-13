@@ -207,7 +207,7 @@ class CGL(SemiLinearModel):
         adjoint[nx:] = 2 * qr * qi * vr + (3 * qi**2 + qr**2) * vi
         return -self.a * adjoint
 
-    def random_ic(self, num_modes: int = 10, amplitude: float = 0.01) -> Vector:
+    def random_ic(self, num_modes: int = 10, max_amplitude: float = .375) -> Vector:
         # Use random coefficients on Gaussian Hermite functions
         Psi_vals = np.array([psi_fun(n, self.xi) for n in range(num_modes)]).T
         B_IC = np.zeros((self.num_states, 2 * num_modes))
@@ -215,8 +215,9 @@ class CGL(SemiLinearModel):
         B_IC[self.nx:, num_modes:] = Psi_vals
 
         # random initial condition
-        q0 = np.dot(B_IC, (amplitude * np.random.randn(2 * num_modes)
-                           / np.sqrt(2 * num_modes)))
+        normal = np.random.randn(2 * num_modes) / np.sqrt(2 * num_modes)
+        amplitude = np.random.uniform(0, max_amplitude)
+        q0 = np.dot(B_IC, (amplitude * normal))
         return q0
 
 
