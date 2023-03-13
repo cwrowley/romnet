@@ -4,9 +4,10 @@ import time
 
 import matplotlib.pyplot as plt
 import numpy as np
+from scipy.integrate import solve_ivp
+
 import romnet
 from romnet.models import CGL
-from scipy.integrate import solve_ivp
 
 
 def compare_timesteppers():
@@ -61,28 +62,28 @@ def compare_timesteppers():
 
     y1 = model.output(q1.T).T
     y2 = model.output(q2.T).T
-    y3 = model.output(sol.y).T
+    y3 = model.output(sol.y_traj).T
     plt.figure()
     plt.plot(t1, y1[:, 0], label=method1)
     plt.plot(t2, y2[:, 0], label=method2)
     plt.plot(t3, y3[:, 0], label="solve_ivp")
-    plt.ylim([-2, 2])
+    plt.ylim([-3, 3])
     plt.legend()
     plt.show()
 
 
 def generate_data():
+
+    # getting discrete model stepper
     model = CGL()
-    dt = 0.5
+    dt = 0.1
     step = model.get_stepper(dt, method="rk3cn")
 
-    num_train = 1
-    num_test = 1
-
+    # generating trajectories
+    num_train = 100
+    num_test = 10
     t_final = 500
     n = int(t_final / dt) + 1
-
-    # generating trajectories
     print("Generating training trajectories...")
     training_traj = romnet.sample(step, model.random_ic, num_train, n)
     test_traj = romnet.sample(step, model.random_ic, num_test, n)
@@ -90,28 +91,35 @@ def generate_data():
     test_traj.save("cgl_test.traj")
 
     # sampling gradients
-    s = 32  # samples per trajectory
-    L = 15  # horizon for gradient sampling
+    s = 10   # samples per trajectory
+    L = 200  # horizon for gradient sampling
     adj_step = model.get_adjoint_stepper(dt, method="rk3cn")
     print("Sampling gradients...")
     training_data, _ = romnet.sample_gradient_long_traj(
         training_traj, adj_step, model.adjoint_output, model.num_outputs, s, L
     )
     test_data, _ = romnet.sample_gradient_long_traj(
-        test_traj, adj_step, model.adjoint_output, model.num_outputs, s, L
+       test_traj, adj_step, model.adjoint_output, model.num_outputs, s, L
     )
-    print("Done")
+
+    # CoBRAS-like rom
+    print("Calculating CoBRAS projectors...")
+    X = training_data.X[::100]
+    G = training_data.G[::100]
+    cobras = romnet.CoBRAS(X, G)
+    cobras.save_projectors("cgl.cobras")
 
     # ProjectedGradientDataset
-    cobras = romnet.CoBRAS(training_data.X, training_data.G)
-    cobras.save_projectors("cgl.cobras")
     rank = 15
+    print("Generating the projected gradient dataset...")
     reduced_training_data = cobras.project(training_data.X, training_data.G, rank)
     reduced_testing_data = cobras.project(test_data.X, test_data.G, rank)
     reduced_training_data.save("cgl_train.dat")
     reduced_testing_data.save("cgl_test.dat")
 
+    print("Done")
+
 
 if __name__ == "__main__":
-    compare_timesteppers()
-    # generate_data()
+    # compare_timesteppers()
+    generate_data()
