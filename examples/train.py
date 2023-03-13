@@ -21,15 +21,6 @@ def train_autoencoder(basename, train_num=""):
     dims = [3, 3, 3, 3, 3, 3, 2]
     autoencoder = romnet.ProjAE(dims)
     # gamma = 0
-    #   cgl
-    """
-    learning_rate = 1.e-3
-    batch_size = 64
-    num_epochs = 50
-    dims = [15, 15, 15, 15, 15, 14]
-    autoencoder = romnet.ProjAE(dims)
-    gamma = 1.e-3
-    """
 
     # save initial weights
     romnet.save_romnet(autoencoder, basename + train_num + "_initial" + ".romnet")
@@ -42,13 +33,6 @@ def train_autoencoder(basename, train_num=""):
         loss = romnet.GAP_loss(X_pred, X, G)
         # reg = gamma * autoencoder.regularizer()
         return loss  # + reg
-
-    """
-    def loss_fn(Xi_pred, X, G, XdotG):
-        loss = romnet.reduced_GAP_loss(Xi_pred, X, G, XdotG)
-        reg = gamma * autoencoder.regularizer()
-        return loss + reg
-    """
 
     # train autoencoder
     optimizer = torch.optim.Adam(autoencoder.parameters(), lr=learning_rate)
@@ -71,5 +55,3 @@ if __name__ == "__main__":
         train_autoencoder("noack")
     elif len(sys.argv) == 2:
         train_autoencoder(sys.argv[1])
-    elif len(sys.argv) == 3:
-        train_autoencoder(sys.argv[1], "_" + sys.argv[2])
