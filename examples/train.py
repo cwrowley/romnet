@@ -2,12 +2,13 @@
 
 import sys
 
-import romnet
+import matplotlib.pyplot as plt
 import torch
 from torch.utils.data import DataLoader
 
+import romnet
 
-def train_autoencoder(basename, train_num=""):
+def train_autoencoder(basename: str):
     # load data
     print(f"Loading data from {basename}_train.dat")
     training_data = romnet.load(basename + "_train.dat")
@@ -20,10 +21,10 @@ def train_autoencoder(basename, train_num=""):
     num_epochs = 750
     dims = [3, 3, 3, 3, 3, 3, 2]
     autoencoder = romnet.ProjAE(dims)
-    # gamma = 0
+    gamma = 0
 
     # save initial weights
-    romnet.save_romnet(autoencoder, basename + train_num + "_initial" + ".romnet")
+    romnet.save_romnet(autoencoder, basename + "_initial" + ".romnet")
 
     # load autoencoder
     # autoencoder = romnet.load_romnet(basename + train_num + ".romnet")
@@ -31,21 +32,32 @@ def train_autoencoder(basename, train_num=""):
     # loss function
     def loss_fn(X_pred, X, G):
         loss = romnet.GAP_loss(X_pred, X, G)
-        # reg = gamma * autoencoder.regularizer()
-        return loss  # + reg
+        reg = gamma * autoencoder.regularizer()
+        return loss  + reg
 
     # train autoencoder
     optimizer = torch.optim.Adam(autoencoder.parameters(), lr=learning_rate)
     train_dataloader = DataLoader(training_data, batch_size=batch_size, shuffle=True)
     test_dataloader = DataLoader(test_data, batch_size=batch_size, shuffle=True)
 
+    loss_epoch = []
     for t in range(num_epochs):
         print(f"Epoch {t+1}\n-----------------")
         romnet.train_loop(train_dataloader, autoencoder, loss_fn, optimizer)
-        romnet.test_loop(test_dataloader, autoencoder, loss_fn)
+        loss = romnet.test_loop(test_dataloader, autoencoder, loss_fn)
+        loss_epoch.append(loss)
+
+    # plot average test loss
+    fig = plt.figure()
+    ax = fig.add_subplot(1, 1, 1)
+    ax.plot(loss_epoch)
+    ax.set_ylabel("Average Test Loss")
+    ax.set_yscale("log")
+    ax.set_xlabel("Epochs")
+    fig.savefig(basename  + "_loss.pdf", format="pdf")
 
     # save autoencoder
-    romnet.save_romnet(autoencoder, basename + train_num + ".romnet")
+    romnet.save_romnet(autoencoder, basename  + ".romnet")
 
     print("Done")
 

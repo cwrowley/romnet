@@ -40,6 +40,8 @@ def test_loop(dataloader, autoencoder, loss_fn):
     loss /= num_batches
     print(f"Average loss: {loss:>7f}")
 
+    return loss
+
 
 class ProjectedGradientDataset:
     def __init__(self, X: ArrayLike, G: ArrayLike, XdotG: ArrayLike):
