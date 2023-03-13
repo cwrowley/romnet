@@ -94,6 +94,8 @@ class CGL(SemiLinearModel):
         self._linear, self.weights, self.xi, self.x = \
             self._construct_matrices()
         self.C = self._construct_output()
+        self.e_val, self.e_vec = np.linalg.eig(self._linear)
+        self.fastslow_idxs = np.argsort(np.abs(np.real(self.e_val)))
 
     @property
     def num_states(self) -> int:
@@ -218,6 +220,12 @@ class CGL(SemiLinearModel):
         normal = np.random.randn(2 * num_modes) / np.sqrt(2 * num_modes)
         amplitude = np.random.uniform(0, max_amplitude)
         q0 = np.dot(B_IC, (amplitude * normal))
+        return q0
+    
+    def random_ic_spiral(self, std: float = 1e-3):
+        slow_subspace = self.e_vec[:, self.fastslow_idxs[:2]]
+        c = std * np.random.randn(2).T
+        q0 = slow_subspace @ c
         return q0
 
 
