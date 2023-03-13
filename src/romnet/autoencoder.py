@@ -181,3 +181,20 @@ def GAP_loss(X_pred: Tensor, X: Tensor, G: Tensor) -> Tensor:
 
 def reduced_GAP_loss(X_pred: Tensor, X: Tensor, G: Tensor, XdotG: Tensor) -> Tensor:
     return torch.mean(torch.square(XdotG - torch.sum(G * X_pred, dim=1)))
+
+
+def recon_loss(X_pred: Tensor, X: Tensor) -> Tensor:
+    E = X - X_pred
+    return torch.mean(torch.sum(E * E, dim=1))
+
+
+def reduced_recon_loss(
+    X_pred: Tensor,
+    X: Tensor,
+    G: Tensor,
+    XdotX: Tensor,
+    M: Tensor
+) -> Tensor:
+    term1 = - 2 * torch.sum(G * X_pred, dim=1)
+    term2 = torch.sum(X_pred, M @ X_pred, dim=1)
+    return torch.mean(XdotX + term1 + term2)
