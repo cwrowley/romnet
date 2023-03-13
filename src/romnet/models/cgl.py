@@ -1,6 +1,6 @@
 """Complex Ginzburg-Landau model"""
 
-from typing import Callable, List, Tuple
+from typing import Callable, List, Tuple, Any
 
 import numpy as np
 from numpy.typing import NDArray
@@ -94,7 +94,7 @@ class CGL(SemiLinearModel):
         self._linear, self.weights, self.xi, self.x = \
             self._construct_matrices()
         self.C = self._construct_output()
-        self.e_val, self.e_vec = np.linalg.eig(self._linear)
+        self.e_val, self.e_vec = np.linalg.eig(self._linear)  # type: Tuple[NDArray[Any], NDArray[Any]]
         self.fastslow_idxs = np.argsort(np.abs(np.real(self.e_val)))
 
     @property
@@ -221,7 +221,7 @@ class CGL(SemiLinearModel):
         amplitude = np.random.uniform(0, max_amplitude)
         q0 = np.dot(B_IC, (amplitude * normal))
         return q0
-    
+
     def random_ic_spiral(self, std: float = 1e-3):
         slow_subspace = self.e_vec[:, self.fastslow_idxs[:2]]
         c = std * np.random.randn(2).T
