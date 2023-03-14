@@ -8,6 +8,7 @@ from torch.utils.data import DataLoader
 
 import romnet
 
+
 def train_autoencoder(basename: str):
     # load data
     print(f"Loading data from {basename}_train.dat")
@@ -33,7 +34,7 @@ def train_autoencoder(basename: str):
     def loss_fn(X_pred, X, G):
         loss = romnet.GAP_loss(X_pred, X, G)
         reg = gamma * autoencoder.regularizer()
-        return loss  + reg
+        return loss + reg
 
     # train autoencoder
     optimizer = torch.optim.Adam(autoencoder.parameters(), lr=learning_rate)
@@ -54,10 +55,10 @@ def train_autoencoder(basename: str):
     ax.set_ylabel("Average Test Loss")
     ax.set_yscale("log")
     ax.set_xlabel("Epochs")
-    fig.savefig(basename  + "_loss.pdf", format="pdf")
+    fig.savefig(basename + "_loss.pdf", format="pdf")
 
     # save autoencoder
-    romnet.save_romnet(autoencoder, basename  + ".romnet")
+    romnet.save_romnet(autoencoder, basename + ".romnet")
 
     print("Done")
 
