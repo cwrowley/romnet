@@ -222,7 +222,7 @@ class CGL(SemiLinearModel):
         q0 = np.dot(B_IC, (amplitude * normal))
         return q0
 
-    def random_ic_spiral(self, std: float = 1e-3):
+    def random_ic_spiral(self, std: float = .1):
         real = np.real(self.e_vec[:, self.fastslow_idxs[0]])
         imag = np.imag(self.e_vec[:, self.fastslow_idxs[0]])
         slow_subspace = np.array([real, imag]).T
