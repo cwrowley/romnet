@@ -136,3 +136,21 @@ class CoBRAS:
         Xproj = X @ self.Psi[:, :rank]
         Gproj = G @ self.Phi[:, :rank]
         return ProjectedGradientDataset(Xproj, Gproj, XdotG)
+
+
+class ProjectedStateDataset:
+    def __init__(self, A: ArrayLike, D: ArrayLike, XdotX: ArrayLike, M: ArrayLike):
+        self.A = np.array(A)
+        self.D = np.array(D)
+        self.XdotX = np.array(XdotX)
+        self.M = np.array(M)
+
+    def __len__(self) -> int:
+        return self.A.shape[0]
+
+    def __getitem__(self, i: int) -> Tuple[Vector, Vector, Vector]:
+        return self.A[i], self.D[i], self.XdotX[i]
+
+    def save(self, fname: str) -> None:
+        with open(fname, "wb") as fp:
+            pickle.dump(self, fp, pickle.HIGHEST_PROTOCOL)

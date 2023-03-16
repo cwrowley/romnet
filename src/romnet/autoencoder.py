@@ -7,7 +7,8 @@ from torch import Tensor, nn
 
 from .typing import Vector
 
-__all__ = ["ProjAE", "GAP_loss", "reduced_GAP_loss", "load_romnet", "save_romnet"]
+__all__ = ["ProjAE", "GAP_loss", "reduced_GAP_loss", "load_romnet", "save_romnet",
+           "recon_loss", "reduced_recon_loss"]
 
 # for better compatibility with numpy arrays
 torch.set_default_dtype(torch.float64)
@@ -196,5 +197,5 @@ def reduced_recon_loss(
     M: Tensor
 ) -> Tensor:
     term1 = - 2 * torch.sum(G * X_pred, dim=1)
-    term2 = torch.sum(X_pred, M @ X_pred, dim=1)
+    term2 = torch.sum(X_pred * (X_pred @ M.T), dim=1)
     return torch.mean(XdotX + term1 + term2)
