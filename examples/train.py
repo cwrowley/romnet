@@ -21,19 +21,24 @@ def train_autoencoder(basename: str):
     batch_size = 400
     num_epochs = 750
     dims = [3, 3, 3, 3, 3, 3, 2]
-    autoencoder = romnet.ProjAE(dims)
-    gamma = 0
+    gamma1 = 1.0e-4
+    autoencoder1 = romnet.ProjAE(dims)
+    num_linear_layers = 3
+    gamma2 = 1.0e-4
+    autoencoder2 = romnet.MultiLinear(dims[-1], num_linear_layers)
+    autoencoder = romnet.AEList([autoencoder1, autoencoder2])
 
     # save initial weights
     romnet.save_romnet(autoencoder, basename + "_initial" + ".romnet")
 
     # load autoencoder
-    # autoencoder = romnet.load_romnet(basename + train_num + ".romnet")
+    # autoencoder = romnet.load_romnet(basename + ".romnet")
 
     # loss function
     def loss_fn(X_pred, X, G):
         loss = romnet.GAP_loss(X_pred, X, G)
-        reg = gamma * autoencoder.regularizer()
+        reg = (gamma1 * autoencoder.regularizer_component(0)
+               + gamma2 * autoencoder.regularizer_component(1))
         return loss + reg
 
     # train autoencoder

@@ -9,7 +9,7 @@ from abc import ABC, abstractmethod
 from .typing import Vector
 
 __all__ = ["ProjAE", "GAP_loss", "reduced_GAP_loss", "load_romnet", "save_romnet",
-           "recon_loss", "reduced_recon_loss"]
+           "recon_loss", "reduced_recon_loss", "AE", "MultiLinear", "AEList"]
 
 # for better compatibility with numpy arrays
 torch.set_default_dtype(torch.float64)
@@ -153,7 +153,7 @@ class AE(nn.Module, ABC):
     def regularizer(self) -> float:
         """Total regularizer"""
         raise NotImplementedError(
-            "Regularizer not implemented for class %s" % self.__class__.__name__
+            "Total regularizer not implemented for class %s" % self.__class__.__name__
         )
 
     def save(self, fname: str) -> None:
@@ -176,9 +176,11 @@ class ProjAE(AE):
             [LayerPair(self.dims[i], self.dims[i + 1]) for i in range(self.num_layers)]
         )
 
+    @property
     def dim_in(self) -> int:
         return self.dims[0]
 
+    @property
     def dim_out(self) -> int:
         return self.dims[-1]
 
@@ -225,15 +227,23 @@ class MultiLinear(AE):
     def __init__(self, dim: int, num_layers: int):
         super().__init__()
         self.dim = dim
+        self.num_layers = num_layers
+        if self.num_layers < 1:
+            raise ValueError("num_layers must be greater than or equal to 1.")
         self.layers = [
             nn.Parameter(torch.tensor(ortho_group.rvs(dim)))
-            for _ in range(num_layers)
+            for _ in range(self.num_layers)
         ]
         self.update()
 
+    def extra_repr(self) -> str:
+        return "dim={}, num_layers={}".format(self.dim, self.dim)
+
+    @property
     def dim_in(self) -> int:
         return self.dim
 
+    @property
     def dim_out(self) -> int:
         return self.dim
 
@@ -247,19 +257,23 @@ class MultiLinear(AE):
 
     def enc(self, x: TVector) -> Tensor:
         x = torch.as_tensor(x).unsqueeze(-1)
-        return self.E @ x
+        return (self.E @ x).squeeze(-1)
 
     def dec(self, x: TVector) -> Tensor:
         x = torch.as_tensor(x).unsqueeze(-1)
-        return self.D @ x
+        return (self.D @ x).squeeze(-1)
 
     def d_enc(self, x: TVector, v: TVector) -> Tuple[Tensor, Tensor]:
         v = torch.as_tensor(v).unsqueeze(-1)
-        return self.enc(x), self.E @ v
+        xout = self.enc(x)
+        vout = (self.E @ v).squeeze(-1)
+        return xout, vout
 
     def d_dec(self, x: TVector, v: TVector) -> Tuple[Tensor, Tensor]:
         v = torch.as_tensor(v).unsqueeze(-1)
-        return self.dec(x), self.D @ v
+        xout = self.dec(x)
+        vout = (self.D @ v).squeeze(-1)
+        return xout, vout
 
     def regularizer(self) -> float:
         total_regularizer = 0.0
@@ -269,9 +283,9 @@ class MultiLinear(AE):
 
 
 class AEList(AE):
-    def __init__(self, ae_list: List[AE], num_linear: int):
+    def __init__(self, ae_list: List[AE]):
         super().__init__()
-        self.ae_list = ae_list
+        self.ae_list = nn.ModuleList(ae_list)
         self.num_ae = len(ae_list)
         if self.num_ae < 2:
             raise ValueError(
@@ -331,13 +345,13 @@ class AEList(AE):
         return self.ae_list[ae_idx].regularizer()
 
 
-def load_romnet(fname: str) -> ProjAE:
+def load_romnet(fname: str) -> AE:
     net = torch.load(fname)
     net.update()
     return net
 
 
-def save_romnet(autoencoder: ProjAE, fname: str) -> None:
+def save_romnet(autoencoder: AE, fname: str) -> None:
     torch.save(autoencoder, fname)
 
 
