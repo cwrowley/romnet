@@ -4,6 +4,7 @@ import numpy as np
 import torch
 from scipy.stats import ortho_group
 from torch import Tensor, nn
+from abc import ABC, abstractmethod
 
 from .typing import Vector
 
@@ -102,7 +103,65 @@ class LayerPair(nn.Module):
         return torch.log(torch.frobenius_norm(P) ** 2 / self.dim_out)
 
 
-class ProjAE(nn.Module):
+class AE(nn.Module, ABC):
+    def __init__(self):
+        super().__init__()
+
+    @property
+    @abstractmethod
+    def dim_in(self) -> int:
+        """Input dimension"""
+
+    @property
+    @abstractmethod
+    def dim_out(self) -> int:
+        """Output dimension"""
+
+    def update(self) -> None:
+        """
+        Update model parameters pre- and post-optimization step.
+
+        Default set to null function.
+        """
+        pass
+
+    @abstractmethod
+    def enc(self, x: TVector) -> Tensor:
+        """Encoder"""
+
+    @abstractmethod
+    def dec(self, x: TVector) -> Tensor:
+        """Decoder"""
+
+    def forward(self, x: TVector) -> Tensor:
+        """Decoder composed with encoder"""
+        return self.dec(self.enc(x))
+
+    @abstractmethod
+    def d_enc(self, x: TVector, v: TVector) -> Tuple[Tensor, Tensor]:
+        """Derivative of encoder"""
+
+    @abstractmethod
+    def d_dec(self, x: TVector, v: TVector) -> Tuple[Tensor, Tensor]:
+        """Derivative of decoder"""
+
+    def d_autoenc(self, x: TVector, v: TVector) -> Tuple[Tensor, Tensor]:
+        """Derivative of decoder composed with encoder"""
+        z, vz = self.d_enc(x, v)
+        return self.d_dec(z, vz)
+
+    def regularizer(self) -> float:
+        """Total regularizer"""
+        raise NotImplementedError(
+            "Regularizer not implemented for class %s" % self.__class__.__name__
+        )
+
+    def save(self, fname: str) -> None:
+        """Save autoencoder"""
+        torch.save(self, fname)
+
+
+class ProjAE(AE):
     """
     Autoencoder constrained to be a projection
 
@@ -116,6 +175,12 @@ class ProjAE(nn.Module):
         self.layers = nn.ModuleList(
             [LayerPair(self.dims[i], self.dims[i + 1]) for i in range(self.num_layers)]
         )
+
+    def dim_in(self) -> int:
+        return self.dims[0]
+
+    def dim_out(self) -> int:
+        return self.dims[-1]
 
     def update(self) -> None:
         for pair in self.layers:
@@ -149,21 +214,121 @@ class ProjAE(nn.Module):
             xout = layer.dec(xout)
         return xout, vout
 
-    def d_autoenc(self, x: TVector, v: TVector) -> Tuple[Tensor, Tensor]:
-        z, vz = self.d_enc(x, v)
-        return self.d_dec(z, vz)
-
-    def forward(self, x: TVector) -> Tensor:
-        return self.dec(self.enc(x))
-
     def regularizer(self) -> float:
         total_regularizer = 0.0
         for layer in self.layers:
             total_regularizer += layer.regularizer()
         return total_regularizer
 
-    def save(self, fname: str) -> None:
-        torch.save(self, fname)
+
+class MultiLinear(AE):
+    def __init__(self, dim: int, num_layers: int):
+        super().__init__()
+        self.dim = dim
+        self.layers = [
+            nn.Parameter(torch.tensor(ortho_group.rvs(dim)))
+            for _ in range(num_layers)
+        ]
+        self.update()
+
+    def dim_in(self) -> int:
+        return self.dim
+
+    def dim_out(self) -> int:
+        return self.dim
+
+    def update(self) -> None:
+        self.E = torch.eye(self.dim)
+        self.D = torch.eye(self.dim)
+        for layer in self.layers:
+            self.E = layer @ self.E
+        for layer in reversed(self.layers):
+            self.D = layer.inverse() @ self.D
+
+    def enc(self, x: TVector) -> Tensor:
+        x = torch.as_tensor(x).unsqueeze(-1)
+        return self.E @ x
+
+    def dec(self, x: TVector) -> Tensor:
+        x = torch.as_tensor(x).unsqueeze(-1)
+        return self.D @ x
+
+    def d_enc(self, x: TVector, v: TVector) -> Tuple[Tensor, Tensor]:
+        v = torch.as_tensor(v).unsqueeze(-1)
+        return self.enc(x), self.E @ v
+
+    def d_dec(self, x: TVector, v: TVector) -> Tuple[Tensor, Tensor]:
+        v = torch.as_tensor(v).unsqueeze(-1)
+        return self.dec(x), self.D @ v
+
+    def regularizer(self) -> float:
+        total_regularizer = 0.0
+        for layer in self.layers:
+            total_regularizer += torch.sum(layer * layer).item()
+        return total_regularizer
+
+
+class AEList(AE):
+    def __init__(self, ae_list: List[AE], num_linear: int):
+        super().__init__()
+        self.ae_list = ae_list
+        self.num_ae = len(ae_list)
+        if self.num_ae < 2:
+            raise ValueError(
+                "projae_list needs length >=2, current length is {}".format(self.num_ae)
+            )
+        for i in range(self.num_ae-1):
+            dim_out = ae_list[i].dim_out
+            dim_in = ae_list[i + 1].dim_in
+            if dim_out != dim_in:
+                raise ValueError(
+                    "Element {} of ae_list has dim_out = {} and next element has dim_in = {}".format(i, dim_out, dim_in)
+                )
+
+    def dim_in(self) -> int:
+        return self.ae_list[0].dim_in
+
+    def dim_out(self) -> int:
+        return self.ae_list[-1].dim_out
+
+    def update(self) -> None:
+        for ae in self.ae_list:
+            ae.update()
+
+    def enc(self, x: TVector) -> Tensor:
+        xout = torch.as_tensor(x)
+        for ae in self.ae_list:
+            xout = ae.enc(xout)
+        return xout
+
+    def dec(self, x: TVector) -> Tensor:
+        xout = torch.as_tensor(x)
+        for ae in reversed(self.ae_list):
+            xout = ae.dec(xout)
+        return xout
+
+    def d_enc(self, x: TVector, v: TVector) -> Tuple[Tensor, Tensor]:
+        xout = torch.as_tensor(x)
+        vout = torch.as_tensor(v)
+        for ae in self.ae_list:
+            xout, vout = ae.d_enc(xout, vout)
+        return xout, vout
+
+    def d_dec(self, x: TVector, v: TVector) -> Tuple[Tensor, Tensor]:
+        xout = torch.as_tensor(x)
+        vout = torch.as_tensor(v)
+        for ae in self.ae_list:
+            xout, vout = ae.d_dec(xout, vout)
+        return xout, vout
+
+    def regularizer(self) -> float:
+        total_regularizer = 0.0
+        for ae in self.ae_list:
+            total_regularizer += ae.regularizer()
+        return total_regularizer
+
+    def regularizer_component(self, ae_idx: int) -> float:
+        return self.ae_list[ae_idx].regularizer()
 
 
 def load_romnet(fname: str) -> ProjAE:
