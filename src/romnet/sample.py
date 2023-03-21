@@ -203,3 +203,21 @@ def sample_gradient_long_traj(
             G.extend(Lam[tau_min:tau_max])
             D.extend([1 / np.sqrt(nu)] * len(Lam[tau_min:tau_max]))
     return GradientDataset(X, G), np.array(D).reshape(-1, 1)
+
+
+class TrajectoryDataSet:
+    def __init__(self, traj: ArrayLike, dt: int):
+        self.traj = np.array(traj)
+        self.num_traj = self.traj.shape[0]
+        self.n = self.traj.shape[1]
+        self.dt = dt
+
+    def __len__(self) -> int:
+        return self.num_traj
+
+    def __getitem__(self, i: int) -> Vector:
+        return self.traj[i]
+
+    def save(self, fname: str) -> None:
+        with open(fname, "wb") as fp:
+            pickle.dump(self, fp, pickle.HIGHEST_PROTOCOL)
