@@ -9,7 +9,7 @@ from abc import ABC, abstractmethod
 from .typing import Vector
 
 __all__ = ["ProjAE", "GAP_loss", "reduced_GAP_loss", "load_romnet", "save_romnet",
-           "recon_loss", "reduced_recon_loss", "AE", "MultiLinear", "AEList"]
+           "recon_loss", "reduced_recon_loss", "AE", "MultiLinear", "AEList", "integral_loss"]
 
 # for better compatibility with numpy arrays
 torch.set_default_dtype(torch.float64)
@@ -379,3 +379,15 @@ def reduced_recon_loss(
     term1 = - 2 * torch.sum(G * X_pred, dim=1)
     term2 = torch.sum(X_pred * (X_pred @ M.T), dim=1)
     return torch.mean(XdotX + term1 + term2)
+
+
+def integral_loss(
+    pred: Tensor,
+    true: Tensor,
+    t: Tensor,
+    weights: Tensor = torch.ones(1)
+) -> Tensor:
+    error = true - pred
+    integrand = torch.sum(error * error, dim=2) * weights
+    integral = torch.trapz(integrand, t, dim=1)
+    return torch.mean(integral) / t[-1]
