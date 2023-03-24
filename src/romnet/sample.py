@@ -211,12 +211,10 @@ class TrajectoryDataset:
         x_traj: ArrayLike,
         y_traj: ArrayLike,
         fx_traj: ArrayLike,
-        dt: int
     ):
         self.x_traj = np.array(x_traj)
         self.y_traj = np.array(y_traj)
         self.fx_traj = np.array(fx_traj)
-        self.dt = dt
 
     def __len__(self) -> int:
         return self.x_traj.shape[0]
