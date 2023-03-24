@@ -248,12 +248,15 @@ class MultiLinear(AE):
         return self.dim
 
     def update(self) -> None:
+        self.inv_layers = []
+        for layer in self.layers:
+            self.inv_layers.append(layer.inverse())
         self.E = torch.eye(self.dim)
         self.D = torch.eye(self.dim)
         for layer in self.layers:
             self.E = layer @ self.E
-        for layer in reversed(self.layers):
-            self.D = layer.inverse() @ self.D
+        for layer in reversed(self.inv_layers):
+            self.D = layer @ self.D
 
     def enc(self, x: TVector) -> Tensor:
         x = torch.as_tensor(x).unsqueeze(-1)
@@ -277,7 +280,7 @@ class MultiLinear(AE):
 
     def regularizer(self) -> float:
         total_regularizer = 0.0
-        for layer in self.layers:
+        for layer in self.inv_layers:
             total_regularizer += torch.sum(layer * layer).item()
         return total_regularizer
 
