@@ -63,6 +63,28 @@ class GradientDataset(Dataset[Tuple[Vector, Vector]]):
             pickle.dump(self, fp, pickle.HIGHEST_PROTOCOL)
 
 
+class TrajectoryDataset(Dataset[Tuple[Vector, Vector, Vector]]):
+    def __init__(
+        self,
+        x_traj: ArrayLike,
+        y_traj: ArrayLike,
+        fx_traj: ArrayLike,
+    ):
+        self.x_traj = np.array(x_traj)
+        self.y_traj = np.array(y_traj)
+        self.fx_traj = np.array(fx_traj)
+
+    def __len__(self) -> int:
+        return self.x_traj.shape[0]
+
+    def __getitem__(self, i: int) -> Tuple[Vector, Vector, Vector]:
+        return self.x_traj[i], self.y_traj[i], self.fx_traj[i]
+
+    def save(self, fname: str) -> None:
+        with open(fname, "wb") as fp:
+            pickle.dump(self, fp, pickle.HIGHEST_PROTOCOL)
+
+
 def load(fname: str) -> Any:
     with open(fname, "rb") as fp:
         data = pickle.load(fp)
@@ -203,25 +225,3 @@ def sample_gradient_long_traj(
             G.extend(Lam[tau_min:tau_max])
             D.extend([1 / np.sqrt(nu)] * len(Lam[tau_min:tau_max]))
     return GradientDataset(X, G), np.array(D).reshape(-1, 1)
-
-
-class TrajectoryDataset:
-    def __init__(
-        self,
-        x_traj: ArrayLike,
-        y_traj: ArrayLike,
-        fx_traj: ArrayLike,
-    ):
-        self.x_traj = np.array(x_traj)
-        self.y_traj = np.array(y_traj)
-        self.fx_traj = np.array(fx_traj)
-
-    def __len__(self) -> int:
-        return self.x_traj.shape[0]
-
-    def __getitem__(self, i: int) -> Tuple[Vector, Vector, Vector]:
-        return self.x_traj[i], self.y_traj[i], self.fx_traj[i]
-
-    def save(self, fname: str) -> None:
-        with open(fname, "wb") as fp:
-            pickle.dump(self, fp, pickle.HIGHEST_PROTOCOL)
