@@ -1,5 +1,7 @@
 """Model of cylinder wake, used in Noack (2000)"""
 
+import torch
+from torch import Tensor
 import numpy as np
 from numpy.typing import NDArray
 
@@ -28,10 +30,11 @@ class NoackModel(Model):
         self.lam = lam
 
     def rhs(self, x: Vector) -> Vector:
-        xdot = self.mu * x[0] - self.omega * x[1] + self.A * x[0] * x[2]
-        ydot = self.omega * x[0] + self.mu * x[1] + self.A * x[1] * x[2]
-        zdot = -self.lam * (x[2] - x[0]**2 - x[1]**2)
-        return np.array([xdot, ydot, zdot])
+        out = np.zeros_like(x)
+        out[..., 0] = self.mu * x[..., 0] - self.omega * x[..., 1] + self.A * x[..., 0] * x[..., 2]
+        out[..., 1] = self.omega * x[..., 0] + self.mu * x[..., 1] + self.A * x[..., 1] * x[..., 2]
+        out[..., 2] = -self.lam * (x[..., 2] - x[..., 0]**2 - x[..., 1]**2)
+        return out
 
     def jac(self, x: Vector) -> NDArray[np.float64]:
         df1 = [self.mu + self.A * x[2], -self.omega, self.A * x[0]]
@@ -41,6 +44,13 @@ class NoackModel(Model):
 
     def adjoint_rhs(self, x: Vector, v: Vector) -> Vector:
         return self.jac(x).T @ v
+
+    def rhs_tensor(self, x: Tensor) -> Tensor:
+        out = torch.zeros_like(x)
+        out[..., 0] = self.mu * x[..., 0] - self.omega * x[..., 1] + self.A * x[..., 0] * x[..., 2]
+        out[..., 1] = self.omega * x[..., 0] + self.mu * x[..., 1] + self.A * x[..., 1] * x[..., 2]
+        out[..., 2] = -self.lam * (x[..., 2] - x[..., 0]**2 - x[..., 1]**2)
+        return out
 
     def slow_manifold(self, r):
         h0 = r**2

@@ -1,8 +1,11 @@
 """Complex Ginzburg-Landau model"""
 
-from typing import Callable, List, Tuple, Any
+from typing import Callable, List, Tuple
+from typing import Any  # noqa: F401
 
 import numpy as np
+import torch
+from torch import Tensor
 from numpy.typing import NDArray
 from scipy.special import eval_hermite, gammaln, roots_hermite
 
@@ -93,6 +96,8 @@ class CGL(SemiLinearModel):
         self.a = a
         self._linear, self.weights, self.xi, self.x = \
             self._construct_matrices()
+        self._linear_tensor = torch.tensor(self._linear)
+        self.weights_tensor = torch.tensor(self.weights)
         self.C = self._construct_output()
         self.e_val, self.e_vec = np.linalg.eig(self._linear)  # type: Tuple[NDArray[Any], NDArray[Any]]
         self.fastslow_idxs = np.argsort(np.abs(np.real(self.e_val)))
@@ -145,20 +150,6 @@ class CGL(SemiLinearModel):
         A = np.vstack([np.hstack([Arr, Ari]), np.hstack([Air, Aii])])
         return A, w_quad, xi, x
 
-    def linear(self, x: Vector) -> Vector:
-        return self._linear @ x
-
-    def adjoint(self, x: Vector) -> Vector:
-        return self._linear.T @ x
-
-    def get_solver(self, alpha: float) -> Callable[[Vector], Vector]:
-        mat = np.eye(self.num_states) - alpha * self._linear
-        return LUSolver(mat)
-
-    def get_adjoint_solver(self, alpha: float) -> Callable[[Vector], Vector]:
-        mat = np.eye(self.num_states) - alpha * self._linear.T
-        return LUSolver(mat)
-
     def _construct_output(self) -> NDArray[np.float64]:
         # observation kernel defined by eqn. 4.1 in M. Ilak et al.
         # branch_2 is downstream bound of unstable region
@@ -172,6 +163,20 @@ class CGL(SemiLinearModel):
         C[0, :self.nx] = ker_obs * np.sqrt(self.weights)
         C[1, self.nx:] = ker_obs * np.sqrt(self.weights)
         return C
+
+    def linear(self, x: Vector) -> Vector:
+        return self._linear @ x
+
+    def adjoint(self, x: Vector) -> Vector:
+        return self._linear.T @ x
+
+    def get_solver(self, alpha: float) -> Callable[[Vector], Vector]:
+        mat = np.eye(self.num_states) - alpha * self._linear
+        return LUSolver(mat)
+
+    def get_adjoint_solver(self, alpha: float) -> Callable[[Vector], Vector]:
+        mat = np.eye(self.num_states) - alpha * self._linear.T
+        return LUSolver(mat)
 
     def output(self, q: Vector) -> Vector:
         return np.dot(self.C, q)
@@ -208,6 +213,22 @@ class CGL(SemiLinearModel):
         adjoint[:nx] = (3 * qr**2 + qi**2) * vr + 2 * qi * qr * vi
         adjoint[nx:] = 2 * qr * qi * vr + (3 * qi**2 + qr**2) * vi
         return -self.a * adjoint
+
+    def linear_tensor(self, q: Tensor) -> Tensor:
+        return q @ self._linear_tensor.T
+
+    def nonlinear_tensor(self, q: Tensor) -> Tensor:
+        # real and imaginary parts in original state space
+        nx = self.nx
+        qr = q[..., :nx]
+        qi = q[..., nx:]
+
+        # evaluate nonlinearity
+        f = torch.zeros_like(q)
+        q_sq = (torch.square(qr) + torch.square(qi)) / self.weights_tensor
+        f[..., :nx] = q_sq * qr
+        f[..., nx:] = q_sq * qi
+        return -self.a * f
 
     def random_ic(self, num_modes: int = 10, max_amplitude: float = .375) -> Vector:
         # Use random coefficients on Gaussian Hermite functions
