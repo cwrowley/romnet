@@ -7,7 +7,7 @@ from torch.utils.data import Dataset
 
 from .typing import Vector, VectorField
 
-__all__ = ["sample", "sample_gradient", "load", "sample_gradient_long_traj"]
+__all__ = ["sample", "sample_gradient", "load", "sample_gradient_long_traj", "sample_fast"]
 
 
 class TrajectoryList(Dataset[Vector]):
@@ -113,6 +113,29 @@ def sample(
             traj.append(x)
         traj_list.append(traj)
     return TrajectoryList(traj_list)
+
+
+def sample_fast(
+    step: VectorField, random_state: Callable[[], Vector], num_traj: int, n: int
+) -> TrajectoryList:
+    """
+    Faster sample() method with a 95%-85% reduction in computation time
+
+    Sample num_traj trajectories each with length n
+
+    random_state() generates a random initial state x
+    step(x) advances the state forward in time
+
+    Returns a TrajectoryList object
+    """
+    ic0 = random_state()
+    traj_traj = np.zeros((num_traj, n, ic0.shape[0]))
+    traj_traj[0, 0, :] = ic0
+    for i in range(num_traj - 1):
+        traj_traj[i + 1, 0, :] = random_state()
+    for i in range(n - 1):
+        traj_traj[:, i + 1, :] = step(traj_traj[:, i, :])
+    return TrajectoryList(traj_traj)
 
 
 def sample_gradient(

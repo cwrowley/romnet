@@ -99,7 +99,7 @@ def generate_data():
         training_traj, adj_step, model.adjoint_output, model.num_outputs, s, L
     )
     test_data, _ = romnet.sample_gradient_long_traj(
-       test_traj, adj_step, model.adjoint_output, model.num_outputs, s, L
+        test_traj, adj_step, model.adjoint_output, model.num_outputs, s, L
     )
 
     # CoBRAS-like rom
