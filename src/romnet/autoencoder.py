@@ -9,7 +9,8 @@ from abc import ABC, abstractmethod
 from .typing import Vector
 
 __all__ = ["ProjAE", "GAP_loss", "reduced_GAP_loss", "load_romnet", "save_romnet",
-           "recon_loss", "reduced_recon_loss", "AE", "MultiLinear", "AEList", "integral_loss"]
+           "recon_loss", "reduced_recon_loss", "AE", "MultiLinear", "AEList", "integral_loss",
+           "weight_func"]
 
 # for better compatibility with numpy arrays
 torch.set_default_dtype(torch.float64)
@@ -100,7 +101,7 @@ class LayerPair(nn.Module):
 
     def regularizer(self) -> Tensor:
         P = self.D @ self.E
-        return torch.log(torch.frobenius_norm(P) ** 2 / self.dim_out)
+        return torch.log(torch.norm(P) ** 2 / self.dim_out)
 
 
 class AE(nn.Module, ABC):
@@ -292,7 +293,7 @@ class AEList(AE):
             raise ValueError(
                 "projae_list needs length >=2, current length is {}".format(self.num_ae)
             )
-        for i in range(self.num_ae-1):
+        for i in range(self.num_ae - 1):
             dim_out = ae_list[i].dim_out
             dim_in = ae_list[i + 1].dim_in
             if dim_out != dim_in:
@@ -391,3 +392,10 @@ def integral_loss(
     integrand = torch.sum(error * error, dim=2) * weights
     integral = torch.trapz(integrand, t, dim=1)
     return torch.mean(integral) / t[-1]
+
+
+def weight_func(t: Tensor, t_final: float, L: float) -> Tensor:
+    m = 2 * L
+    term1 = np.exp(m * t_final) - m * t_final
+    term2 = np.exp(m * t) - m * t
+    return (term1 - term2) / (4 * (L**2))
