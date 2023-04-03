@@ -6,7 +6,7 @@ from scipy.stats import ortho_group
 from torch import Tensor, nn
 from abc import ABC, abstractmethod
 
-from .typing import Vector
+from .typing import Vector, VectorList
 
 __all__ = ["ProjAE", "GAP_loss", "reduced_GAP_loss", "load_romnet", "save_romnet",
            "recon_loss", "reduced_recon_loss", "AE", "MultiLinear", "AEList", "integral_loss",
@@ -222,6 +222,43 @@ class ProjAE(AE):
         for layer in self.layers:
             total_regularizer += layer.regularizer()
         return total_regularizer
+
+    def fastslow_init(self, Phi: VectorList, Psi: VectorList, var: float = 0.01):
+        r = self.dims[-1]
+        if ((r == len(Phi)) and (r == len(Psi))):
+            ValueError(
+                "Phi and Psi must have the same length as the autoencoder's"
+                " latent dimension: {}".format(r)
+            )
+        dim_in = self.layers[0].dim_in
+        dim_out = self.layers[0].dim_out
+        self.layers[0].D = nn.Parameter(
+            torch.hstack(
+                (torch.tensor(Phi), torch.eye(dim_in)[:, r:dim_out])
+            ) + var * torch.randn((dim_in, dim_out))
+        )
+        self.layers[0].X = nn.Parameter(
+            torch.hstack(
+                (torch.tensor(Psi), torch.eye(dim_in)[:, r:dim_out])
+            ).T + var * torch.randn((dim_in, dim_out)).T
+        )
+        self.layers[0].bias = nn.Parameter(
+            (-np.sqrt(2 * self.layers[0].a) / self.layers[0].a
+             * (self.layers[0].D @ torch.ones(dim_out, 1)))
+        )
+        for layer in self.layers[1:]:
+            dim_in = layer.dim_in
+            dim_out = layer.dim_out
+            layer.D = nn.Parameter(
+                torch.eye(dim_in)[:, :dim_out] + var * torch.randn((dim_in, dim_out))
+            )
+            layer.X = nn.Parameter(
+                torch.eye(dim_in)[:, :dim_out].T + var * torch.randn((dim_in, dim_out)).T
+            )
+            layer.bias = nn.Parameter(
+                -np.sqrt(2 * layer.a) / layer.a * (layer.D @ torch.ones(dim_out, 1))
+            )
+        self.update()
 
 
 class MultiLinear(AE):
