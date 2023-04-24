@@ -82,7 +82,7 @@ class KuramotoSivashinsky(BilinearModel):
 
     def bilinear(self, a: Vector, b: Vector) -> Vector:
         # a * b_x
-        return fft_multiply(a, self._deriv * b)
+        return -fft_multiply(a, self._deriv * b)
 
     def nonlinear(self, u: Vector) -> Vector:
         return self.bilinear(u, u)
