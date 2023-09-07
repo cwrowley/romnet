@@ -5,7 +5,7 @@ from typing import Callable, Dict, List, Type
 
 from .typing import Vector, VectorField
 
-__all__ = ["Timestepper", "SemiImplicit"]
+__all__ = ["Timestepper", "SemiImplicit", "StochasticETD"]
 
 
 class Timestepper(abc.ABC):
@@ -92,6 +92,52 @@ class SemiImplicit(abc.ABC):
     def methods(cls) -> List[str]:
         return list(cls.__registry.keys())
 
+class StochasticETD(abc.ABC):
+    """Abstract base class for explicit stochastic exponential time differencing."""
+
+    # registry for subclasses, mapping names to constructors
+    __registry: Dict[str, Type["StochasticETD"]] = {}
+
+    def __init_subclass__(cls) -> None:
+        name = cls.__name__.lower()
+        cls.__registry[name] = cls
+
+    @classmethod
+    def lookup(cls, method: str) -> Type["StochasticETD"]:
+        """Return the subclass corresponding to the string in `method`."""
+        try:
+            return cls.__registry[method.lower()]
+        except KeyError as exc:
+            raise NotImplementedError(f"Method '{method}' unknown") from exc
+
+    def __init__(
+        self,
+        dt: float,
+        ETD_linear_exp: Callable[[Vector, float], Vector],
+        ETD_matrix_inv: VectorField,
+        noise: VectorField
+    ):
+        self._dt = dt
+        self.ETD_linear_exp = ETD_linear_exp
+        self.ETD_matrix_inv = ETD_matrix_inv
+        self.noise = noise
+
+    @property
+    def dt(self) -> float:
+        return self._dt
+
+    @dt.setter
+    def dt(self, value: float) -> None:
+        self._dt = value
+        self.update()
+
+    @abc.abstractmethod
+    def step(self, x: Vector, nonlinear: VectorField) -> Vector:
+        """Advance the state forward by one step"""
+
+    @classmethod
+    def methods(cls) -> List[str]:
+        return list(cls.__registry.keys())
 
 class Euler(Timestepper):
     """Explicit Euler timestepper."""
@@ -171,3 +217,14 @@ class RK3CN(SemiImplicit):
         rhs3 = x2 + B[2] * Q3 + Bprime[2] * self.dt * self.linear(x2)
         x3 = self.solvers[2](rhs3)
         return x3
+        
+class SETD1(StochasticETD):
+    """First-Order Stochastic Exponential Time Differencing Scheme
+
+    Adamu & Lord 2012, Numerical approximation of multiplicative SPDEs
+    """
+
+    def step(self, x: Vector, nonlinear: VectorField) -> Vector:
+        rhs_linear_and_noise = self.ETD_linear_exp(x + (self.dt**0.5)*self.noise(x), self.dt)
+        rhs_nonlinear = self.ETD_matrix_inv(self.ETD_linear_exp(nonlinear(x), self.dt) - nonlinear(x))
+        return rhs_linear_and_noise + rhs_nonlinear

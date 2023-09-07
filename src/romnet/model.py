@@ -10,7 +10,7 @@ import torch
 from numpy.typing import ArrayLike
 from scipy.linalg import lu_factor, lu_solve
 
-from .timestepper import SemiImplicit, Timestepper
+from .timestepper import SemiImplicit, StochasticETD, Timestepper
 from .typing import Vector, VectorField, VectorList
 
 __all__ = ["Model", "SemiLinearModel", "BilinearModel", "LUSolver", "project",
@@ -143,10 +143,15 @@ class SemiLinearModel(Model):
     ) -> Callable[[Vector], Vector]:
         try:
             cls = SemiImplicit.lookup(method)
+            stepper = cls(dt, self.linear, self.get_solver)
+            return DiscreteModel(self.nonlinear, stepper) 
         except NotImplementedError:
-            return super().get_stepper(dt, method)
-        stepper = cls(dt, self.linear, self.get_solver)
-        return DiscreteModel(self.nonlinear, stepper)
+            try:
+                cls = StochasticETD.lookup(method)
+                stepper = cls(dt, self.linear_exp, self.matrix_inv, self.noise)
+                return DiscreteModel(self.nonlinear, stepper)
+            except NotImplementedError:
+                return super().get_stepper(dt, method)
 
     def get_adjoint_stepper(
         self, dt: float, method: str = "rk2cn"
@@ -285,7 +290,7 @@ class BilinearModel(SemiLinearModel):
 @dataclass
 class DiscreteModel:
     rhs: VectorField
-    timestepper: Union[Timestepper, SemiImplicit]
+    timestepper: Union[SemiImplicit, StochasticETD, Timestepper]
 
     def __call__(self, x: Vector) -> Vector:
         return self.timestepper.step(x, self.rhs)
