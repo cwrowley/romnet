@@ -99,7 +99,7 @@ def main():
     nt = int(Lt/dt + 1)
     nx = 2 * nmodes
     dx = L / (2 * nmodes)
-    sol = np.zeros((nt, nx))
+    sol = np.zeros((nt, 2 * nx))
     T = np.arange(nt) * dt
     x = np.arange(2 * nmodes) * dx
 
