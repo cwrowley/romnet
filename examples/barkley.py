@@ -1,10 +1,10 @@
 #!/usr/bin/env python
 
+import os
+
 import matplotlib.pyplot as plt
 import numpy as np
-import os
 import romnet
-
 from romnet.models import BarkleyPuffModel
 from romnet.models.barkley import fft_multiply, freq_to_space, space_to_freq
 
@@ -65,9 +65,9 @@ def main():
     Du = 0.01
     delta = 0.1
     kappa = 2
-    
+
     time_interval = 1 # every time units we output the data
-    
+
     r = 0.75
     sigma = 0.5
     epsilon = 0.01
@@ -92,7 +92,7 @@ def main():
     initial_value  = np.loadtxt(filename)
     q_initial  = initial_value[:,1]
     u_initial  = initial_value[:,2]
-    
+
     u[:nmodes+1] = space_to_freq(q_initial)
     u[nmodes+1:] = space_to_freq(u_initial)
 
@@ -103,10 +103,10 @@ def main():
     T = np.arange(nt) * dt
     x = np.arange(2 * nmodes) * dx
 
-    path = "/scratch/network/ys5910/Barkley_Model/Stochastic/" + "solution_r_" + str(r) + "_sigma_" + str(sigma) + "_epsilon_" + str(epsilon_1) + "_no_" + str(job_id) 
+    path = "/scratch/network/ys5910/Barkley_Model/Stochastic/" + "solution_r_" + str(r) + "_sigma_" + str(sigma) + "_epsilon_" + str(epsilon_1) + "_no_" + str(job_id)
     os.makedirs( path )
     os.chdir( path )
-    
+
     print("Computing solution...")
 
     for t in range(nt):
@@ -114,11 +114,11 @@ def main():
         sol[t] = np.append(freq_to_space(u[:nmodes+1]),freq_to_space(u[nmodes+1:]))
         if t % int(time_interval/dt) == 0:
             print("  step %4d / %4d" % (t, nt))
-            
+
             filename = "no_" + str(job_id) + "_time_" + str( int(t*dt) ) + ".txt"
             np.savetxt( filename , np.column_stack( (x, sol[t,:nx], sol[t,nx:]) ), fmt = '%.4f %e %e')
             #np.savetxt( filename , np.column_stack( (x, sol[:nx], sol[nx:]) ), fmt = '%.4f %e %e')
-            
+
             plt.plot(x, sol[t,:nx], color = 'r', label='q')
             plt.plot(x, sol[t,nx:], color = 'b', label='u')
             #plt.plot(x, sol[:nx], color = 'r', label='q')

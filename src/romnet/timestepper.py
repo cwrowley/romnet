@@ -217,7 +217,7 @@ class RK3CN(SemiImplicit):
         rhs3 = x2 + B[2] * Q3 + Bprime[2] * self.dt * self.linear(x2)
         x3 = self.solvers[2](rhs3)
         return x3
-        
+
 class SETD1(StochasticETD):
     """First-Order Stochastic Exponential Time Differencing Scheme
 

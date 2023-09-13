@@ -31,7 +31,7 @@ def space_to_freq(y: Vector) -> Vector:
 
 
 class BarkleyPuffModel(SemiLinearModel):
-    
+
     def __init__(self, nmodes: int, L: float, u0: float, ubar: float, zeta: float, D:float, Du:float, delta: float, epsilon_1: float, epsilon_2: float, r: float, sigma: float):
         """summary here
 
@@ -55,12 +55,12 @@ class BarkleyPuffModel(SemiLinearModel):
         k = np.arange(nmodes + 1)
         ksq = (2 * np.pi / L) ** 2 * k**2
         self._deriv = (2j * np.pi / L) * k
-        
+
         # Linear dynamics
         self._linear_factor_tl = -(delta+u0)*np.ones(self.nmodes+1) - D*ksq + zeta*self._deriv
         self._linear_factor_bl = epsilon_2*ubar*np.ones(self.nmodes+1)
         self._linear_factor_br = -epsilon_1*np.ones(self.nmodes+1) - Du*ksq
-        
+
 
     def get_solver(self, alpha: float) -> Callable[[Vector], Vector]:
         def solver(u: Vector) -> Vector:

@@ -144,7 +144,7 @@ class SemiLinearModel(Model):
         try:
             cls = SemiImplicit.lookup(method)
             stepper = cls(dt, self.linear, self.get_solver)
-            return DiscreteModel(self.nonlinear, stepper) 
+            return DiscreteModel(self.nonlinear, stepper)
         except NotImplementedError:
             try:
                 cls = StochasticETD.lookup(method)
