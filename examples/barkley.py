@@ -55,7 +55,7 @@ def main():
 
     nmodes = 256
     L = 500
-    Lt = 500
+    Lt = 50
     dt = 2e-3
 
     u0 = 2
@@ -103,7 +103,8 @@ def main():
     T = np.arange(nt) * dt
     x = np.arange(2 * nmodes) * dx
 
-    path = "/scratch/network/ys5910/Barkley_Model/Stochastic/" + "solution_r_" + str(r) + "_sigma_" + str(sigma) + "_epsilon_" + str(epsilon_1) + "_no_" + str(job_id)
+    # path = "/scratch/network/ys5910/Barkley_Model/Stochastic/" + "solution_r_" + str(r) + "_sigma_" + str(sigma) + "_epsilon_" + str(epsilon_1) + "_no_" + str(job_id)
+    path = "output/" + "solution_r_" + str(r) + "_sigma_" + str(sigma) + "_epsilon_" + str(epsilon_1) + "_no_" + str(job_id)
     os.makedirs( path )
     os.chdir( path )
 
