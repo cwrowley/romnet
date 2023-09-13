@@ -1,6 +1,7 @@
 """timestepper - step ordinary differential equations forward in time"""
 
 import abc
+import math
 from typing import Callable, Dict, List, Type
 
 from .typing import Vector, VectorField
@@ -92,6 +93,7 @@ class SemiImplicit(abc.ABC):
     def methods(cls) -> List[str]:
         return list(cls.__registry.keys())
 
+
 class StochasticETD(abc.ABC):
     """Abstract base class for explicit stochastic exponential time differencing."""
 
@@ -113,13 +115,13 @@ class StochasticETD(abc.ABC):
     def __init__(
         self,
         dt: float,
-        ETD_linear_exp: Callable[[Vector, float], Vector],
-        ETD_matrix_inv: VectorField,
+        exp_linear: Callable[[Vector, float], Vector],
+        linear_inv: VectorField,
         noise: VectorField
     ):
         self._dt = dt
-        self.ETD_linear_exp = ETD_linear_exp
-        self.ETD_matrix_inv = ETD_matrix_inv
+        self.exp_linear = exp_linear
+        self.linear_inv = linear_inv
         self.noise = noise
 
     @property
@@ -138,6 +140,7 @@ class StochasticETD(abc.ABC):
     @classmethod
     def methods(cls) -> List[str]:
         return list(cls.__registry.keys())
+
 
 class Euler(Timestepper):
     """Explicit Euler timestepper."""
@@ -218,6 +221,7 @@ class RK3CN(SemiImplicit):
         x3 = self.solvers[2](rhs3)
         return x3
 
+
 class SETD1(StochasticETD):
     """First-Order Stochastic Exponential Time Differencing Scheme
 
@@ -225,6 +229,6 @@ class SETD1(StochasticETD):
     """
 
     def step(self, x: Vector, nonlinear: VectorField) -> Vector:
-        rhs_linear_and_noise = self.ETD_linear_exp(x + (self.dt**0.5)*self.noise(x), self.dt)
-        rhs_nonlinear = self.ETD_matrix_inv(self.ETD_linear_exp(nonlinear(x), self.dt) - nonlinear(x))
+        rhs_linear_and_noise = self.exp_linear(x + math.sqrt(self.dt) * self.noise(x), self.dt)
+        rhs_nonlinear = self.linear_inv(self.exp_linear(nonlinear(x), self.dt) - nonlinear(x))
         return rhs_linear_and_noise + rhs_nonlinear
